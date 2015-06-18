@@ -1,0 +1,21 @@
+{
+  "name": "allex_entrypointservice",
+  "version": "0.1.0",
+  "description": "EntryPointService",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@gitlab.hers.rs:allex_services/entrypoint.git"
+  },
+  "keywords": [
+    "ecosystem:allex",
+    "Service",
+    "EntryPoint"
+  ],
+  "author": "HERS Belgrade",
+  "license": "ISC"
+}
+
