@@ -31,6 +31,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     this.port = prophash.port;
     ParentService.call(this, prophash);
+    this.state.set('port',this.port);
     this.authenticator = null;
     this.targets = new lib.Map();
     execSuite.acquireAuthSink(prophash.strategies).done(
