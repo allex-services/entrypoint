@@ -11,10 +11,9 @@ function createServicePack(execlib){
   );
 
   function realCreator(defer, ParentServicePack) {
-    defer.resolve({
-      Service: require('./servicecreator')(execlib, ParentServicePack),
-      SinkMap: require('./sinkmapcreator')(execlib, ParentServicePack)
-    });
+    var ret = require('./clientside')(execlib, ParentServicePack);
+    ret.Service = require('./servicecreator')(execlib, ParentServicePack);
+    defer.resolve(ret);
   }
 
   return d.promise;
