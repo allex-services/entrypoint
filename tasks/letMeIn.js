@@ -11,11 +11,13 @@ function createLetMeInTask (execlib) {
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
     this.session = prophash.session;
+    this.subsinks = prophash.subsinks;
     this.cb = prophash.cb;
   }
   lib.inherit(LetMeInTask, Task);
   LetMeInTask.prototype.destroy = function () {
     this.cb = null;
+    this.subsinks = null;
     this.session = null;
     this.identity = null;
     this.sinkname = null;
@@ -91,8 +93,34 @@ function createLetMeInTask (execlib) {
     taskobj = null;
     taskRegistry.run('acquireUserServiceSink', {
       sink: sink,
-      cb: this.cb
+      cb: this.onUserServiceSink.bind(this)
     });
+    //TODO: what happens to `sink` later? Lost?
+  };
+  LetMeInTask.prototype.onUserServiceSink = function (sink) {
+    if(this.subsinks){
+      this.goToSubSink(0, sink);
+    } else {
+      this.finalize(sink);
+    }
+  };
+  LetMeInTask.prototype.goToSubSink = function (subsinkindex, sink) {
+    subsinkindex = subsinkindex || 0;
+    var subsinkcount = this.subsinks ? this.subsinks.length : 0,
+      subsink;
+    if(subsinkindex>=subsinkcount){
+      this.finalize(sink);
+    } else {
+      subsink = this.subsinks[subsinkindex];
+      sink.subConnect(subsink.name,subsink.identity).done(
+        this.goToSubSink.bind(this,subsinkindex+1),
+        console.error.bind(console,'Error in subConnect-ing to',subsink.name)
+      );
+      //TODO: what happens to `sink` later? Lost?
+    }
+  };
+  LetMeInTask.prototype.finalize = function (sink) {
+    this.cb(sink);
   };
   LetMeInTask.prototype.compulsoryConstructionProperties = ['cb'];
 
