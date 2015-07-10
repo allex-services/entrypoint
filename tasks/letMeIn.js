@@ -13,9 +13,13 @@ function createLetMeInTask (execlib) {
     this.session = prophash.session;
     this.subsinks = prophash.subsinks;
     this.cb = prophash.cb;
+    this.ipaddress = null;
+    this.sinks = [];
   }
   lib.inherit(LetMeInTask, Task);
   LetMeInTask.prototype.destroy = function () {
+    this.sinks = null; //TODO: containerDestroyAll
+    this.ipaddress = null;
     this.cb = null;
     this.subsinks = null;
     this.session = null;
@@ -72,6 +76,7 @@ function createLetMeInTask (execlib) {
       var response, taskobj = {task:null};
       try {
         response = JSON.parse(responseobj.data);
+        this.ipaddress = response.ipaddress;
         taskobj.task = taskRegistry.run('acquireSink',{
           connectionString: 'ws://'+response.ipaddress+':'+response.port,
           session: response.session,
@@ -88,6 +93,7 @@ function createLetMeInTask (execlib) {
     if(!sink) {
       return;
     }
+    this.sinks.push(sink);
     lib.runNext(taskobj.task.destroy.bind(taskobj.task));
     taskobj.task = null;
     taskobj = null;
@@ -95,7 +101,6 @@ function createLetMeInTask (execlib) {
       sink: sink,
       cb: this.onUserServiceSink.bind(this)
     });
-    //TODO: what happens to `sink` later? Lost?
   };
   LetMeInTask.prototype.onUserServiceSink = function (sink) {
     if(this.subsinks){
@@ -108,6 +113,7 @@ function createLetMeInTask (execlib) {
     subsinkindex = subsinkindex || 0;
     var subsinkcount = this.subsinks ? this.subsinks.length : 0,
       subsink;
+    this.sinks.push(sink);
     if(subsinkindex>=subsinkcount){
       this.finalize(sink);
     } else {
@@ -116,11 +122,14 @@ function createLetMeInTask (execlib) {
         this.goToSubSink.bind(this,subsinkindex+1),
         console.error.bind(console,'Error in subConnect-ing to',subsink.name)
       );
-      //TODO: what happens to `sink` later? Lost?
     }
   };
   LetMeInTask.prototype.finalize = function (sink) {
-    this.cb(sink);
+    this.cb({
+      task: this,
+      sink: sink,
+      taskRegistry: taskRegistry
+    });
   };
   LetMeInTask.prototype.compulsoryConstructionProperties = ['cb'];
 
