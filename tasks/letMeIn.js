@@ -6,12 +6,75 @@ function createLetMeInTask (execlib) {
     Task = execSuite.Task,
     taskRegistry = execSuite.taskRegistry;
 
+  function SinkRepresentation(){
+    this.state = {};
+    this.data = [];
+    this.subsinks = {};
+    this.sink = null;
+  }
+  SinkRepresentation.prototype.destroy = function () {
+    //TODO: all the destroys need to be called here
+    this.sink = null;
+    this.subsinks = null;
+    this.data = null;
+    this.state = null;
+  };
+  SinkRepresentation.prototype.setSink = function (sink) {
+    console.log('setSink', sink.recordDescriptor);
+    this.sink = sink;
+    taskRegistry.run('materializeState',{
+      sink: sink,
+      data: this.state
+    });
+    if(sink.recordDescriptor){
+      taskRegistry.run('materializeData',{
+        sink: sink,
+        data: this.data,
+        onRecordCreation: console.log.bind(console,'record')
+      });
+    }
+  };
+
+  function UserSinkRepresentation(){
+    SinkRepresentation.call(this);
+  }
+  lib.inherit(UserSinkRepresentation, SinkRepresentation);
+  UserSinkRepresentation.prototype.setSink = function (sink) {
+    var sinkstate = taskRegistry.run('materializeState',{sink: sink}),
+      subinits = [];
+    sink.sinkInfo.forEach(this.onSubSinkInfo.bind(this, subinits));
+    console.log('running acquireSubSinks', subinits, sinkstate);
+    try{
+    taskRegistry.run('acquireSubSinks',{
+      state: sinkstate,
+      subinits: subinits,
+      debug:true
+    });
+    }catch (e) {
+      console.error(e.stack);
+      console.error(e);
+    }
+  };
+  UserSinkRepresentation.prototype.onSubSinkInfo = function (subinits, subsinkinfo) {
+    console.log('materialize', subsinkinfo, '?');
+    var subsink = this.subsinks[subsinkinfo.name];
+    if (!subsink) {
+      subsink = new SinkRepresentation();
+      this.subsinks[subsinkinfo.name] = subsink;
+    }
+    subinits.push({
+      name: subsinkinfo.name,
+      identity: {name: 'user', role: 'user'},
+      cb: subsink.setSink.bind(subsink)
+    });
+  };
+
   function LetMeInTask (prophash) {
     Task.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
     this.session = prophash.session;
-    this.subsinks = prophash.subsinks;
+    this.representation = new UserSinkRepresentation();
     this.cb = prophash.cb;
     this.ipaddress = null;
     this.sinks = [];
@@ -21,7 +84,8 @@ function createLetMeInTask (execlib) {
     this.sinks = null; //TODO: containerDestroyAll
     this.ipaddress = null;
     this.cb = null;
-    this.subsinks = null;
+    this.representation.destroy();
+    this.representation = null;
     this.session = null;
     this.identity = null;
     this.sinkname = null;
@@ -103,7 +167,8 @@ function createLetMeInTask (execlib) {
     });
   };
   LetMeInTask.prototype.onUserServiceSink = function (sink) {
-    if(this.subsinks){
+    this.representation.setSink(sink);
+    if(sink.sinkInfo && sink.sinkInfo.length){
       this.goToSubSink(0, sink);
     } else {
       this.finalize(sink);
@@ -111,18 +176,21 @@ function createLetMeInTask (execlib) {
   };
   LetMeInTask.prototype.goToSubSink = function (subsinkindex, sink) {
     subsinkindex = subsinkindex || 0;
-    var subsinkcount = this.subsinks ? this.subsinks.length : 0,
+    var subsinkcount = sink.sinkInfo ? sink.sinkInfo.length : 0,
       subsink;
     this.sinks.push(sink);
     if(subsinkindex>=subsinkcount){
       this.finalize(sink);
     } else {
-      subsink = this.subsinks[subsinkindex];
+      subsink = sink.sinkInfo[subsinkindex];
       sink.subConnect(subsink.name,subsink.identity).done(
-        this.goToSubSink.bind(this,subsinkindex+1),
+        this.onSubSink.bind(this, subsinkindex, sink),
         console.error.bind(console,'Error in subConnect-ing to',subsink.name)
       );
     }
+  };
+  LetMeInTask.prototype.onSubSink = function (subsinkindex, sink, subsink) {
+    this.goToSubSink.bind(this, subsinkindex+1, sink);
   };
   LetMeInTask.prototype.finalize = function (sink) {
     this.cb({
