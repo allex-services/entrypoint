@@ -6,75 +6,12 @@ function createLetMeInTask (execlib) {
     Task = execSuite.Task,
     taskRegistry = execSuite.taskRegistry;
 
-  function SinkRepresentation(){
-    this.state = {};
-    this.data = [];
-    this.subsinks = {};
-    this.sink = null;
-  }
-  SinkRepresentation.prototype.destroy = function () {
-    //TODO: all the destroys need to be called here
-    this.sink = null;
-    this.subsinks = null;
-    this.data = null;
-    this.state = null;
-  };
-  SinkRepresentation.prototype.setSink = function (sink) {
-    console.log('setSink', sink.recordDescriptor);
-    this.sink = sink;
-    taskRegistry.run('materializeState',{
-      sink: sink,
-      data: this.state
-    });
-    if(sink.recordDescriptor){
-      taskRegistry.run('materializeData',{
-        sink: sink,
-        data: this.data,
-        onRecordCreation: console.log.bind(console,'record')
-      });
-    }
-  };
-
-  function UserSinkRepresentation(){
-    SinkRepresentation.call(this);
-  }
-  lib.inherit(UserSinkRepresentation, SinkRepresentation);
-  UserSinkRepresentation.prototype.setSink = function (sink) {
-    var sinkstate = taskRegistry.run('materializeState',{sink: sink}),
-      subinits = [];
-    sink.sinkInfo.forEach(this.onSubSinkInfo.bind(this, subinits));
-    console.log('running acquireSubSinks', subinits, sinkstate);
-    try{
-    taskRegistry.run('acquireSubSinks',{
-      state: sinkstate,
-      subinits: subinits,
-      debug:true
-    });
-    }catch (e) {
-      console.error(e.stack);
-      console.error(e);
-    }
-  };
-  UserSinkRepresentation.prototype.onSubSinkInfo = function (subinits, subsinkinfo) {
-    console.log('materialize', subsinkinfo, '?');
-    var subsink = this.subsinks[subsinkinfo.name];
-    if (!subsink) {
-      subsink = new SinkRepresentation();
-      this.subsinks[subsinkinfo.name] = subsink;
-    }
-    subinits.push({
-      name: subsinkinfo.name,
-      identity: {name: 'user', role: 'user'},
-      cb: subsink.setSink.bind(subsink)
-    });
-  };
-
   function LetMeInTask (prophash) {
     Task.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
     this.session = prophash.session;
-    this.representation = new UserSinkRepresentation();
+    this.representation = new execSuite.UserRepresentation();
     this.cb = prophash.cb;
     this.ipaddress = null;
     this.sinks = [];

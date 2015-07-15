@@ -1,5 +1,6 @@
 function createClientSide(execlib,ParentServicePack) {
   'use strict';
+  execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
   return {
     SinkMap: require('./sinkmapcreator')(execlib, ParentServicePack),
     Tasks: [{

@@ -32,12 +32,22 @@ function createEntryPointService(execlib, ParentServicePack) {
     this.port = prophash.port;
     ParentService.call(this, prophash);
     this.state.set('port',this.port);
+    this.allowAnonymous = prophash.allowAnonymous;
     this.authenticator = null;
     this.targets = new lib.Map();
+    this.remoteDBSink = null;
+    this.remoteDBSinkFinder = null;
     execSuite.acquireAuthSink(prophash.strategies).done(
       this.onAuthenticator.bind(this),
       this.close.bind(this)
     );
+    if (prophash && prophash.strategies && prophash.strategies.remote){
+      this.remoteDBSinkFinder = taskRegistry.run('findSink', {
+        sinkname: prophash.strategies.remote.sinkname,
+        identity: prophash.strategies.remote.identity,
+        onSink: this.onRemoteDBSink.bind(this)
+      });
+    }
     this.strategynames = Object.keys(prophash.strategies);
     this.processTarget(prophash.target);
   }
@@ -47,10 +57,19 @@ function createEntryPointService(execlib, ParentServicePack) {
     if(!this.targets){
       return;
     }
+    if(this.remoteDBSinkFinder){
+      this.remoteDBSinkFinder.destroy();
+    }
+    this.remoteDBSinkFinder = null;
+    if(this.remoteDBSink){
+      this.remoteDBSink.destroy();
+    }
+    this.remoteDBSink = null;
     if(this.authenticator){
       this.authenticator.destroy();
     }
     this.authenticator = null;
+    this.allowAnonymous = null;
     lib.containerDestroyAll(this.targets);
     this.targets.destroy();
     this.targets = null;
@@ -62,40 +81,30 @@ function createEntryPointService(execlib, ParentServicePack) {
     defer.resolve(this.port);
   };
   EntryPointService.prototype._onRequest = function(req,res){
-    var credentials,
-      url = Url.parse(req.url,true),
+    var url = Url.parse(req.url,true),
       query = url.query,
-      session = query ? query.session : null,
-      mymethod = this[url.pathname.substring(1)],
-      preparedmethod;
+      mymethodname = url.pathname.substring(1),
+      mymethod = this[mymethodname],
+      isanonymous = this.anonymousMethods.indexOf(mymethodname)>=0,
+      targetmethodlength = isanonymous ? 3 : 3;
+    //any mymethod has to accept (url,req,res),
     if('function' !== typeof mymethod){
       res.end();
       return;
     }
-    //mymethod has to accept (url,req,res,identityobj),
-    //identityobj = {userhash:userhash,session:session}
-    if(mymethod.length!==4){
-      res.end('My method length '+mymethod.length+' is not 4');
+    if(mymethod.length!==targetmethodlength){
+      res.end(mymethodname+' length '+mymethod.length+' is not '+targetmethodlength);
       return;
     }
-    preparedmethod = mymethod.bind(this,url,req,res);
-    if(session){
-      var d = q.defer();
-      this.checkSession(session,d);
-      d.promise.done(
-        preparedmethod,
-        res.end.bind(res)
-      );
-      return;
+    if (isanonymous) {
+      if (this.allowAnonymous) {
+        mymethod.call(this, url, req, res);
+      } else {
+        res.end();
+      }
+    } else {
+      mymethod.call(this, url, req, res);
     }
-    if(req.method==='GET'){
-      this.authenticate(query).done(
-        this.onUserResolved.bind(this,preparedmethod),
-        res.end.bind(res)
-      );
-      return;
-    }
-    res.end("tiddle-dee-dum");
   };
   EntryPointService.prototype.authenticate = function(credentials){
     if(!this.strategynames){
@@ -116,6 +125,13 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     this.authenticator = authsink;
   };
+  EntryPointService.prototype.onRemoteDBSink = function (remotedbsink) {
+    if(!this.destroyed){
+      remotedbsink.destroy();
+      return;
+    }
+    this.remoteDBSink = remotedbsink;
+  };
   var _instancenameTargetPrefix = 'instancename:';
   EntryPointService.prototype.processTarget = function(target){
     if(target.indexOf(_instancenameTargetPrefix)===0){
@@ -123,7 +139,6 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
   };
   EntryPointService.prototype.huntSingleTarget = function(sinkname){
-    console.log('findAndRun!',sinkname);
     taskRegistry.run('findAndRun',{
       program: {
         sinkname:sinkname,
@@ -151,25 +166,18 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
   };
   EntryPointService.prototype.checkSession = function(session,defer){
+    defer = defer || q.defer();
     defer.resolve({userhash:{name:'user',role:'user'},session:session});
+    return defer.promise;
   };
-  EntryPointService.prototype.onUserResolved = function(preparedmethod,userhash){
+  EntryPointService.prototype.processResolvedUser = function (userhash) {
     if(!userhash){
-      preparedmethod({userhash:null,session:null});
-      return;
+      return {userhash:null,session:null};
     }
-    var d = q.defer();
-    this.produceSession(userhash,d);
-    d.promise.done(
-      preparedmethod,
-      function(reason){
-        console.error(reason);
-        preparedmethod({userhash:null,session:null});
-      }
-    );
+    return this.produceSession(userhash);
   };
-  EntryPointService.prototype.produceSession = function(userhash,defer){
-    defer.resolve({userhash:userhash,session:lib.uid()});
+  EntryPointService.prototype.produceSession = function(userhash){
+    return {userhash:userhash,session:lib.uid()};
   };
   function firstTargetChooser(targetobj,target,targetname){
     targetobj.target = target;
@@ -177,11 +185,13 @@ function createEntryPointService(execlib, ParentServicePack) {
     return true;
   };
   EntryPointService.prototype.chooseTarget = function(defer) {
+    defer = defer || q.defer();
     var targetobj = {target:null,name:null};
     this.targets.traverseConditionally(firstTargetChooser.bind(null,targetobj));
     defer.resolve(targetobj);
+    return defer.promise;
   };
-  EntryPointService.prototype.onTargetChosen = function(req,res,identityobj,targetobj){
+  EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
     if(!targetobj.target){
       res.end();
       return;
@@ -190,30 +200,118 @@ function createEntryPointService(execlib, ParentServicePack) {
       port = targetobj.target.publicport || targetobj.target.port,
       session = identityobj.session;
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash).done(
-      function(){
-        res.end(JSON.stringify({
-          ipaddress:ipaddress,
-          port:port,
-          session:session
-        }));
-      },
+      res.end.bind(res,JSON.stringify({
+        ipaddress:ipaddress,
+        port:port,
+        session:session
+      })),
       res.end.bind(res)
     );
   };
-  EntryPointService.prototype.letMeIn = function(url,req,res,identityobj){
-    console.log('letMeIn with',this.targets.count,'targets');
+  EntryPointService.prototype.letMeIn = function(url,req,res){
+    if(url && url.query && url.query.session){
+      this.checkSession(url.query.session).done(
+        this.doLetHimIn.bind(this, res),
+        res.end.bind(res)
+      );
+      return;
+    }
+    this.extractRequestParams(url, req).then(
+      this.authenticate.bind(this)
+    ).then(
+      this.processResolvedUser.bind(this)
+    ).then(
+      this.doLetHimIn.bind(this, res)
+    ).catch(function(reason){
+      res.end();
+    });
+  };
+  EntryPointService.prototype.doLetHimIn = function (res, identityobj) {
     if(!identityobj.session){
       res.end();
       return;
     }
     //now, introduceSession to a __chosen__ target. __chosen__
-    var d = q.defer();
-    this.chooseTarget(d);
-    d.promise.done(
-      this.onTargetChosen.bind(this,req,res,identityobj),
+    this.chooseTarget().done(
+      this.onTargetChosen.bind(this,res,identityobj),
       res.end.bind(res)
     );
   };
+  EntryPointService.prototype.register = function (url, req, res) {
+    this.extractRequestParams(url, req).then(
+      this.onRegisterParams.bind(this, res)
+    ).catch(
+      res.end.bind(res, '')
+    );
+  };
+  EntryPointService.prototype.onRegisterParams = function (res, registerobj) {
+    if(!this.remoteDBSink){
+      res.end('service is currently down');
+      return;
+    }
+    this.remoteDBSink.call('registerUser',registerobj).done(
+      this.onRegisterSucceeded.bind(this, res, registerobj),
+      this.onRegisterFailed.bind(this, res)
+    );
+  };
+  EntryPointService.prototype.onRegisterSucceeded = function (res, registerobj, result) {
+    this.authenticate(registerobj).then(
+      this.processResolvedUser.bind(this)
+    ).then(
+      this.doLetHimIn.bind(this, res)
+    ).catch(function(reason){
+      res.end();
+    });
+  };
+  EntryPointService.prototype.onRegisterFailed = function (res, result) {
+    console.log('register nok', result);
+    res.end();
+  };
+  EntryPointService.prototype.usernameExists = function (url, req, res) {
+    this.extractRequestParams(url, req).then(
+      this.onUserNameForCheck.bind(this, res)
+    ).catch(
+      res.end.bind(res, '')
+    );
+  };
+  EntryPointService.prototype.onUserNameForCheck = function (res, usernameobj) {
+    var username = usernameobj ? usernameobj.username : null;
+    if(!username){
+      res.end();
+      return;
+    }
+    if(!this.remoteDBSink){
+      res.end('service is currently down');
+      return;
+    }
+    this.remoteDBSink.call('usernameExists',username).done(
+      res.end.bind(res),
+      res.end.bind(res,'false')
+    );
+  };
+  EntryPointService.prototype.extractRequestParams = function(url, req, defer){
+    defer = defer || q.defer();
+    if (req.method==='GET') {
+      defer.resolve(url.query);
+      return defer.promise;
+    }
+    if (req.method==='PUT') {
+      this.readRequestBody(req, defer);
+      return defer.promise;
+    }
+    return defer.promise;
+  };
+  EntryPointService.prototype.readRequestBody = function (req, defer) {
+    defer = defer || q.defer();
+    var body = '';
+    req.on('end', defer.resolve.bind(defer,body));
+    req.on('error', defer.reject.bind(defer));
+    req.on('data', function(chunk) {
+      body += chunk;
+    });
+    return defer.promise;
+  };
+  EntryPointService.prototype.anonymousMethods = ['register', 'letMeInOnce'];
   
   return EntryPointService;
 }
