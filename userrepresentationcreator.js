@@ -44,7 +44,7 @@ function createUserRepresentation(execlib) {
   };
 
   function SinkRepresentation(){
-    this.state = {};
+    this.state = new lib.Map;
     this.data = [];
     this.subsinks = {};
     this.sink = null;
@@ -54,6 +54,7 @@ function createUserRepresentation(execlib) {
     this.sink = null;
     this.subsinks = null;
     this.data = null;
+    this.state.destroy();
     this.state = null;
   };
   SinkRepresentation.prototype.setSink = function (sink) {
