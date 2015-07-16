@@ -14,11 +14,9 @@ function createLetMeInTask (execlib) {
     this.representation = new execSuite.UserRepresentation();
     this.cb = prophash.cb;
     this.ipaddress = null;
-    this.sinks = [];
   }
   lib.inherit(LetMeInTask, Task);
   LetMeInTask.prototype.destroy = function () {
-    this.sinks = null; //TODO: containerDestroyAll
     this.ipaddress = null;
     this.cb = null;
     this.representation.destroy();
@@ -94,7 +92,6 @@ function createLetMeInTask (execlib) {
     if(!sink) {
       return;
     }
-    this.sinks.push(sink);
     lib.runNext(taskobj.task.destroy.bind(taskobj.task));
     taskobj.task = null;
     taskobj = null;
@@ -112,10 +109,11 @@ function createLetMeInTask (execlib) {
     }
   };
   LetMeInTask.prototype.goToSubSink = function (subsinkindex, sink) {
+    console.log('goToSubSink',subsinkindex,'?');
     subsinkindex = subsinkindex || 0;
     var subsinkcount = sink.sinkInfo ? sink.sinkInfo.length : 0,
       subsink;
-    this.sinks.push(sink);
+    console.log('subsinkindex',subsinkindex,'<> subsinkcount',subsinkcount,'?');
     if(subsinkindex>=subsinkcount){
       this.finalize(sink);
     } else {
@@ -127,7 +125,9 @@ function createLetMeInTask (execlib) {
     }
   };
   LetMeInTask.prototype.onSubSink = function (subsinkindex, sink, subsink) {
-    this.goToSubSink.bind(this, subsinkindex+1, sink);
+    console.log('onSubSink subsinkindex',subsinkindex);
+    //this.goToSubSink.bind(this, subsinkindex+1, sink);
+    this.goToSubSink(subsinkindex+1, sink);
   };
   LetMeInTask.prototype.finalize = function (sink) {
     this.cb({
