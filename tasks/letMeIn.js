@@ -101,12 +101,16 @@ function createLetMeInTask (execlib) {
     });
   };
   LetMeInTask.prototype.onUserServiceSink = function (sink) {
-    this.representation.setSink(sink);
+    this.representation.setSink(sink).done(
+      this.finalize.bind(this, sink)
+    );
+    /*
     if(sink.sinkInfo && sink.sinkInfo.length){
       this.goToSubSink(0, sink);
     } else {
       this.finalize(sink);
     }
+    */
   };
   LetMeInTask.prototype.goToSubSink = function (subsinkindex, sink) {
     console.log('goToSubSink',subsinkindex,'?');
