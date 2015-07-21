@@ -43,6 +43,80 @@ function createUserRepresentation(execlib) {
     }
   };
 
+  function EventConsumer(eventconsumers, cb){
+    this.ecs = eventconsumers;
+    this.subscription = this.ecs.consumers.add(cb);
+  }
+  EventConsumer.prototype.destroy = function () {
+    if (this.subscription) {
+      this.ecs.consumers.removeOne(this.subscription);
+    }
+    this.subscription = null;
+    this.ecs = null;
+  };
+
+  function EventConsumers(){
+    this.consumers = new lib.SortedList();
+    this.listeners = null;
+    this.hookcollection = null;
+  }
+  EventConsumers.prototype.destroy = function () {
+    this.hookcollection = null;
+    this.consumers.destroy();
+    this.consumers = null;
+    this.detach();
+  };
+  EventConsumers.prototype.attachTo = function (hookcollection) {
+    this.detach();
+    this.hookcollection = hookcollection;
+    this.listeners = this.consumers.map(function(cons){
+      return hookcollection.attach(cons);
+    });
+  };
+  EventConsumers.prototype.detach = function () { //detach is "detach self from hook given in attachTo
+    if(!this.listeners){
+      return;
+    }
+    this.hookcollection = null;
+    lib.containerDestroyAll(this.listeners);
+    this.listeners.destroy();
+    this.listeners = null;
+  };
+  EventConsumers.prototype.attach = function (cb) { //attach is "remember this cb for later attachTo"
+    if(this.hookcollection){
+      this.listeners.push(this.hookcollection.attach(cb));
+    }
+    return new EventConsumer(this,cb);
+  };
+
+  function DataEventConsumers(){
+    this.onInitiated = new EventConsumers();
+    this.onRecordCreation = new EventConsumers();
+    this.onNewRecord = new EventConsumers();
+    this.onUpdate = new EventConsumers();
+    this.onRecordUpdate = new EventConsumers();
+    this.onDelete = new EventConsumers();
+    this.onRecordDeletion = new EventConsumers();
+  }
+  DataEventConsumers.prototype.attachTo = function (hookcollection) {
+    this.onInitiated.attachTo(hookcollection);
+    this.onRecordCreation.attachTo(hookcollection);
+    this.onNewRecord.attachTo(hookcollection);
+    this.onUpdate.attachTo(hookcollection);
+    this.onRecordUpdate.attachTo(hookcollection);
+    this.onDelete.attachTo(hookcollection);
+    this.onRecordDeletion.attachTo(hookcollection);
+  };
+  DataEventConsumers.prototype.detach = function () {
+    this.onInitiated.detach();
+    this.onRecordCreation.detach();
+    this.onNewRecord.detach();
+    this.onUpdate.detach();
+    this.onRecordUpdate.detach();
+    this.onDelete.detach();
+    this.onRecordDeletion.detach();
+  };
+
   function SinkRepresentation(){
     this.state = new lib.Map;
     this.data = [];
@@ -57,23 +131,53 @@ function createUserRepresentation(execlib) {
     this.state.destroy();
     this.state = null;
   };
-  SinkRepresentation.prototype.setSink = function (sink) {
-    var d = q.defer();
+
+  function addNameTo(name, namedhasharry) {
+    if (!namedhasharry.some(function (nh) {
+      return nh.name === name;
+    })){
+      namedhasharry.push ({name: name});
+    }
+  }
+
+  SinkRepresentation.prototype.setSink = function (sink, sinkinfoextras) {
+    var d = q.defer(),
+      subsinkinfoextras = [];
     this.sink = sink;
     if (!sink) {
     } else {
-      if(sink.recordDescriptor){
-        taskRegistry.run('materializeData',{
-          sink: sink,
-          data: this.data,
-          onRecordCreation: console.log.bind(console,'record')
+      if (sinkinfoextras && !sink.sinkInfo) {
+        sink.sinkInfo = [];
+      }
+      //console.log('at the beginning', sink.sinkInfo, '+', sinkinfoextras);
+      if (sinkinfoextras) {
+        sinkinfoextras.forEach(function (sinkinfo) {
+          if (sinkinfo) {
+            if (sinkinfo.length===1) {
+              addNameTo(sinkinfo[0], sink.sinkInfo);
+            } else {
+              subsinkinfoextras.push(sinkinfo);
+            }
+          }
         });
       }
-      this.handleSinkInfo(d);
+      //console.log('finally', sink.sinkInfo);
+      if(sink.recordDescriptor){
+        taskRegistry.run('materializeData',this.produceDataMaterializationPropertyHash(sink));
+      }
+      this.handleSinkInfo(d, subsinkinfoextras);
     }
     return d.promise;
   };
-  SinkRepresentation.prototype.handleSinkInfo = function (defer) {
+  SinkRepresentation.prototype.produceDataMaterializationPropertyHash = function (sink) {
+    var ret = {
+      sink: sink,
+      data: this.data
+    };
+    //traverse the existing handlers and attach accordingly
+    return ret;
+  };
+  SinkRepresentation.prototype.handleSinkInfo = function (defer, subsinkinfoextras) {
     var sinkstate = taskRegistry.run('materializeState',{
         sink: this.sink,
         data: this.state
@@ -84,11 +188,24 @@ function createUserRepresentation(execlib) {
       return;
     }
     activationobj = new SinkActivationMonitor(defer);
-    this.sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj));
+    if (this.sink.sinkInfo) {
+      this.sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
+    } else if (subsinkinfoextras) {
+      console.log('but still',subsinkinfoextras);
+    }
     activationobj.run(sinkstate);
   };
-  SinkRepresentation.prototype.subSinkInfo2SubInit = function (activationobj, subsinkinfo) {
-    var subsink = this.subsinks[subsinkinfo.name];
+  SinkRepresentation.prototype.subSinkInfo2SubInit = function (activationobj, subsinkinfoextras, subsinkinfo) {
+    var subsink = this.subsinks[subsinkinfo.name], 
+      subsubsinkinfoextras = [];
+    if (subsinkinfoextras) {
+      subsinkinfoextras.forEach(function (esubsinkinfo) {
+        if (esubsinkinfo[0] === subsinkinfo.name) {
+          subsubsinkinfoextras.push(esubsinkinfo.slice(1));
+        }
+      });
+    }
+    //console.log(subsinkinfoextras, '+', subsinkinfo.name, '=>', subsubsinkinfoextras);
     if (!subsink) {
       subsink = new SinkRepresentation();
       this.subsinks[subsinkinfo.name] = subsink;
@@ -96,11 +213,11 @@ function createUserRepresentation(execlib) {
     activationobj.subinits.push({
       name: subsinkinfo.name,
       identity: {name: 'user', role: 'user'},
-      cb: this.subSinkActivated.bind(this, activationobj, subsink)//subsink.setSink.bind(subsink)
+      cb: this.subSinkActivated.bind(this, activationobj, subsink, subsubsinkinfoextras)//subsink.setSink.bind(subsink)
     });
   };
-  SinkRepresentation.prototype.subSinkActivated = function (activationobj, subsink, subsubsink) {
-    activationobj.add(subsink.setSink(subsubsink));
+  SinkRepresentation.prototype.subSinkActivated = function (activationobj, subsink, subsubsinkinfoextras, subsubsink) {
+    activationobj.add(subsink.setSink(subsubsink, subsubsinkinfoextras));
   };
 
   function UserSinkRepresentation(){

@@ -13,11 +13,13 @@ function createLetMeInTask (execlib) {
     this.session = prophash.session;
     this.representation = new execSuite.UserRepresentation();
     this.cb = prophash.cb;
+    this.sinkinfoextras = prophash.sinkinfoextras;
     this.ipaddress = null;
   }
   lib.inherit(LetMeInTask, Task);
   LetMeInTask.prototype.destroy = function () {
     this.ipaddress = null;
+    this.sinkinfoextras = null;
     this.cb = null;
     this.representation.destroy();
     this.representation = null;
@@ -101,37 +103,9 @@ function createLetMeInTask (execlib) {
     });
   };
   LetMeInTask.prototype.onUserServiceSink = function (sink) {
-    this.representation.setSink(sink).done(
+    this.representation.setSink(sink, this.sinkinfoextras).done(
       this.finalize.bind(this, sink)
     );
-    /*
-    if(sink.sinkInfo && sink.sinkInfo.length){
-      this.goToSubSink(0, sink);
-    } else {
-      this.finalize(sink);
-    }
-    */
-  };
-  LetMeInTask.prototype.goToSubSink = function (subsinkindex, sink) {
-    console.log('goToSubSink',subsinkindex,'?');
-    subsinkindex = subsinkindex || 0;
-    var subsinkcount = sink.sinkInfo ? sink.sinkInfo.length : 0,
-      subsink;
-    console.log('subsinkindex',subsinkindex,'<> subsinkcount',subsinkcount,'?');
-    if(subsinkindex>=subsinkcount){
-      this.finalize(sink);
-    } else {
-      subsink = sink.sinkInfo[subsinkindex];
-      sink.subConnect(subsink.name,subsink.identity).done(
-        this.onSubSink.bind(this, subsinkindex, sink),
-        console.error.bind(console,'Error in subConnect-ing to',subsink.name)
-      );
-    }
-  };
-  LetMeInTask.prototype.onSubSink = function (subsinkindex, sink, subsink) {
-    console.log('onSubSink subsinkindex',subsinkindex);
-    //this.goToSubSink.bind(this, subsinkindex+1, sink);
-    this.goToSubSink(subsinkindex+1, sink);
   };
   LetMeInTask.prototype.finalize = function (sink) {
     this.cb({
