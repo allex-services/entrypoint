@@ -49,10 +49,27 @@ function createEntryPointService(execlib, ParentServicePack) {
       });
     }
     this.strategynames = Object.keys(prophash.strategies);
+    this.sessionsSinkName = prophash.sessionsDB;
+    this.sessionsWriterSink = null;
+    if (this.sessionsSinkName) {
+      taskRegistry.run('findSink', {
+        sinkname: this.sessionsSinkName,
+        identity: {
+          name: 'user',
+          role: 'user', //needs to be 'writer'
+        },
+        onSink: this.onSessionsWriterSink.bind(this)
+      });
+    }
     this.processTarget(prophash.target);
   }
   ParentService.inherit(EntryPointService,factoryCreator);
   EntryPointService.prototype.__cleanUp = function () {
+    if (this.sessionsWriterSink) {
+      this.sessionsWriterSink.destroy();
+    }
+    this.sessionsWriterSink = null;
+    this.sessionsSinkName = null;
     this.strategynames = null;
     if(!this.targets){
       return;
@@ -132,42 +149,25 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     this.remoteDBSink = remotedbsink;
   };
-  var _instancenameTargetPrefix = 'instancename:';
-  EntryPointService.prototype.processTarget = function(target){
-    if(target.indexOf(_instancenameTargetPrefix)===0){
-      this.huntSingleTarget(target.substring(_instancenameTargetPrefix.length));
-    }
-  };
-  EntryPointService.prototype.huntSingleTarget = function(sinkname){
-    taskRegistry.run('findAndRun',{
-      program: {
-        sinkname:sinkname,
-        identity:{name:'service',role:'service'},
-        task:{
-          name:this.onSingleTargetFound.bind(this,sinkname),
-          propertyhash:{
-            ipaddress: 'fill yourself',
-            wsport: 'fill yourself'
-          }
-        }
-      }
-    });
-  };
-  EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
-    console.log('single target found',sinkinfo);
-    if(sinkinfo.sink){
-      this.targets.add(sinkname,new TargetContainer(sinkname,sinkinfo));
-    }else{
-      var tc = this.targets.remove(sinkname);
-      if(tc){
-        tc.destroy();
-      }
-      this.huntSingleTarget(sinkname);
-    }
-  };
   EntryPointService.prototype.checkSession = function(session,defer){
     defer = defer || q.defer();
-    defer.resolve({userhash:{name:'user',role:'user'},session:session});
+    if (!this.sessionsSinkName) {
+      defer.reject(new lib.Error('NO_SESSIONS_SUPPORT'));
+    } else {
+      taskRegistry.run('findSink', {
+        sinkname: this.sessionsSinkName,
+        identity: {
+          name: 'user',
+          role: 'user',
+          filter: {
+            op: 'eq',
+            field: 'session',
+            value: session 
+          }
+        },
+        onSink: this.onSessionCheckerSink.bind(this, session, defer)
+      });
+    }
     return defer.promise;
   };
   EntryPointService.prototype.processResolvedUser = function (userhash) {
@@ -177,36 +177,19 @@ function createEntryPointService(execlib, ParentServicePack) {
     return this.produceSession(userhash);
   };
   EntryPointService.prototype.produceSession = function(userhash){
-    return {userhash:userhash,session:lib.uid()};
-  };
-  function firstTargetChooser(targetobj,target,targetname){
-    targetobj.target = target;
-    targetobj.name = targetname;
-    return true;
-  };
-  EntryPointService.prototype.chooseTarget = function(defer) {
-    defer = defer || q.defer();
-    var targetobj = {target:null,name:null};
-    this.targets.traverseConditionally(firstTargetChooser.bind(null,targetobj));
-    defer.resolve(targetobj);
-    return defer.promise;
-  };
-  EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
-    if(!targetobj.target){
-      res.end();
-      return;
+    var session = lib.uid(),
+      identityobj = {userhash:userhash,session:session},
+      d;
+    if (this.sessionsWriterSink) {
+      d = q.defer() ;
+      this.sessionsWriterSink.call('create', {session:session, username: userhash.name}).done(
+        d.resolve.bind(d,identityobj),
+        d.reject.bind(d)
+      );
+      return d.promise;
+    } else {
+      return identityobj;
     }
-    var ipaddress = targetobj.target.publicaddress || targetobj.target.address,
-      port = targetobj.target.publicport || targetobj.target.port,
-      session = identityobj.session;
-    targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash).done(
-      res.end.bind(res,JSON.stringify({
-        ipaddress:ipaddress,
-        port:port,
-        session:session
-      })),
-      res.end.bind(res)
-    );
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
     if(url && url.query && url.query.session){
@@ -310,6 +293,95 @@ function createEntryPointService(execlib, ParentServicePack) {
       body += chunk;
     });
     return defer.promise;
+  };
+  EntryPointService.prototype.onSessionCheckerSink = function (session, defer, sessionsink) {
+    var data = [];
+    taskRegistry.run('materializeData', {
+      sink: sessionsink,
+      data: data,
+      onInitiated: this.onSessionRead.bind(this, session, defer, sessionsink, data)
+    });
+  };
+  EntryPointService.prototype.onSessionRead = function (session, defer, sessionsink, data) {
+    var record = data[0];
+    if (record) {
+      //now get the User DB record from remoteDBSink and resolve the defer with that record data
+      this.remoteDBSink.call('fetchUser', {
+        username: record.username
+      }).done(this.onUserFetched.bind(this, session, defer));
+    } else {
+      defer.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
+    }
+  };
+  EntryPointService.prototype.onUserFetched = function (session, defer, userhash) {
+    defer.resolve({userhash:userhash,session:session});
+  };
+  EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
+    this.sessionsWriterSink = sessionswritersink;
+  };
+
+  //target handling fun
+  var _instancenameTargetPrefix = 'instancename:';
+  EntryPointService.prototype.processTarget = function(target){
+    if(target.indexOf(_instancenameTargetPrefix)===0){
+      this.huntSingleTarget(target.substring(_instancenameTargetPrefix.length));
+    }
+  };
+  EntryPointService.prototype.huntSingleTarget = function(sinkname){
+    taskRegistry.run('findAndRun',{
+      program: {
+        sinkname:sinkname,
+        identity:{name:'service',role:'service'},
+        task:{
+          name:this.onSingleTargetFound.bind(this,sinkname),
+          propertyhash:{
+            ipaddress: 'fill yourself',
+            wsport: 'fill yourself'
+          }
+        }
+      }
+    });
+  };
+  EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
+    console.log('single target found',sinkinfo);
+    if(sinkinfo.sink){
+      this.targets.add(sinkname,new TargetContainer(sinkname,sinkinfo));
+    }else{
+      var tc = this.targets.remove(sinkname);
+      if(tc){
+        tc.destroy();
+      }
+      this.huntSingleTarget(sinkname);
+    }
+  };
+  function firstTargetChooser(targetobj,target,targetname){
+    targetobj.target = target;
+    targetobj.name = targetname;
+    return true;
+  };
+  EntryPointService.prototype.chooseTarget = function(defer) {
+    defer = defer || q.defer();
+    var targetobj = {target:null,name:null};
+    this.targets.traverseConditionally(firstTargetChooser.bind(null,targetobj));
+    defer.resolve(targetobj);
+    return defer.promise;
+  };
+  EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
+    if(!targetobj.target){
+      res.end();
+      return;
+    }
+    var ipaddress = targetobj.target.publicaddress || targetobj.target.address,
+      port = targetobj.target.publicport || targetobj.target.port,
+      session = identityobj.session;
+    targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash).done(
+      res.end.bind(res,JSON.stringify({
+        ipaddress:ipaddress,
+        port:port,
+        session:session
+      })),
+      res.end.bind(res)
+    );
   };
   EntryPointService.prototype.anonymousMethods = ['register', 'letMeInOnce'];
   

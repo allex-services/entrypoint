@@ -88,6 +88,12 @@ function createUserRepresentation(execlib) {
     }
     return new EventConsumer(this,cb);
   };
+  EventConsumers.prototype.fire = function () {
+    var args = arguments;
+    this.consumers.traverse(function (l) {
+      l.apply(null,args);
+    });
+  };
 
   function DataEventConsumers(){
     this.onInitiated = new EventConsumers();
@@ -98,33 +104,50 @@ function createUserRepresentation(execlib) {
     this.onDelete = new EventConsumers();
     this.onRecordDeletion = new EventConsumers();
   }
-  DataEventConsumers.prototype.attachTo = function (hookcollection) {
-    this.onInitiated.attachTo(hookcollection);
-    this.onRecordCreation.attachTo(hookcollection);
-    this.onNewRecord.attachTo(hookcollection);
-    this.onUpdate.attachTo(hookcollection);
-    this.onRecordUpdate.attachTo(hookcollection);
-    this.onDelete.attachTo(hookcollection);
-    this.onRecordDeletion.attachTo(hookcollection);
+  DataEventConsumers.prototype.destroy = function () {
+    this.onInitiated.destroy();
+    this.onInitiated = null;
+    this.onRecordCreation.destroy();
+    this.onRecordCreation = null;
+    this.onNewRecord.destroy();
+    this.onNewRecord = null;
+    this.onUpdate.destroy();
+    this.onUpdate = null;
+    this.onRecordUpdate.destroy();
+    this.onRecordUpdate = null;
+    this.onDelete.destroy();
+    this.onDelete = null;
+    this.onRecordDeletion.destroy();
+    this.onRecordDeletion = null;
   };
-  DataEventConsumers.prototype.detach = function () {
-    this.onInitiated.detach();
-    this.onRecordCreation.detach();
-    this.onNewRecord.detach();
-    this.onUpdate.detach();
-    this.onRecordUpdate.detach();
-    this.onDelete.detach();
-    this.onRecordDeletion.detach();
+  DataEventConsumers.prototype.listenerPack = function () {
+    var orc = this.onRecordCreation;
+    return {
+      //onRecordCreation: this.onRecordCreation.fire.bind(this.onRecordCreation)
+      onRecordCreation: function (){
+                          try{
+        orc.fire.apply(orc,arguments);
+                          } catch (e) {
+                            console.error(e.stack);
+                            console.error(e);
+                          }
+      }
+    };
   };
 
-  function SinkRepresentation(){
+  function SinkRepresentation(eventhandlers){
     this.state = new lib.Map;
     this.data = [];
     this.subsinks = {};
     this.sink = null;
+    this.dataEvents = new DataEventConsumers();
   }
   SinkRepresentation.prototype.destroy = function () {
     //TODO: all the destroys need to be called here
+    if (this.dataEvents) {
+      this.dataEvents.destroy();
+    }
+    this.dataEvents = null;
     this.sink = null;
     this.subsinks = null;
     this.data = null;
@@ -170,11 +193,10 @@ function createUserRepresentation(execlib) {
     return d.promise;
   };
   SinkRepresentation.prototype.produceDataMaterializationPropertyHash = function (sink) {
-    var ret = {
-      sink: sink,
-      data: this.data
-    };
-    //traverse the existing handlers and attach accordingly
+    var ret = this.dataEvents.listenerPack();
+    ret.sink = sink;
+    ret.data = this.data;
+    console.log('returning',ret);
     return ret;
   };
   SinkRepresentation.prototype.handleSinkInfo = function (defer, subsinkinfoextras) {

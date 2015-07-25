@@ -11,7 +11,7 @@ function createLetMeInTask (execlib) {
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
     this.session = prophash.session;
-    this.representation = new execSuite.UserRepresentation();
+    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
     this.cb = prophash.cb;
     this.sinkinfoextras = prophash.sinkinfoextras;
     this.ipaddress = null;
