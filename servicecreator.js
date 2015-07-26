@@ -56,7 +56,7 @@ function createEntryPointService(execlib, ParentServicePack) {
         sinkname: this.sessionsSinkName,
         identity: {
           name: 'user',
-          role: 'user', //needs to be 'writer'
+          role: 'writer',
         },
         onSink: this.onSessionsWriterSink.bind(this)
       });
