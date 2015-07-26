@@ -94,6 +94,9 @@ function createUserRepresentation(execlib) {
       l.apply(null,args);
     });
   };
+  EventConsumers.prototype.fire_er = function () {
+    return this.fire.bind(this);
+  };
 
   function DataEventConsumers(){
     this.onInitiated = new EventConsumers();
@@ -123,15 +126,13 @@ function createUserRepresentation(execlib) {
   DataEventConsumers.prototype.listenerPack = function () {
     var orc = this.onRecordCreation;
     return {
-      //onRecordCreation: this.onRecordCreation.fire.bind(this.onRecordCreation)
-      onRecordCreation: function (){
-                          try{
-        orc.fire.apply(orc,arguments);
-                          } catch (e) {
-                            console.error(e.stack);
-                            console.error(e);
-                          }
-      }
+      onInitiated: this.onInitiated.fire_er(),
+      onRecordCreation: this.onRecordCreation.fire_er(),
+      onNewRecord: this.onNewRecord.fire_er(),
+      onUpdate: this.onUpdate.fire_er(),
+      onRecordUpdate: this.onRecordUpdate.fire_er(),
+      onDelete: this.onDelete.fire_er(),
+      onRecordDeletion: this.onRecordDeletion.fire_er()
     };
   };
 
@@ -141,9 +142,13 @@ function createUserRepresentation(execlib) {
     this.subsinks = {};
     this.sink = null;
     this.dataEvents = new DataEventConsumers();
+    console.log('eventhandlers', eventhandlers);
+    this.eventHandlers = eventhandlers;
+    this.connectEventHandlers(eventhandlers);
   }
   SinkRepresentation.prototype.destroy = function () {
     //TODO: all the destroys need to be called here
+    this.eventHandlers = null;
     if (this.dataEvents) {
       this.dataEvents.destroy();
     }
@@ -153,6 +158,27 @@ function createUserRepresentation(execlib) {
     this.data = null;
     this.state.destroy();
     this.state = null;
+  };
+  SinkRepresentation.prototype.connectEventHandlers = function (eventhandlers) {
+    if (!eventhandlers) {
+      return;
+    }
+    try {
+    if (eventhandlers.data) {
+      var de = this.dataEvents;
+      lib.traverseShallow(eventhandlers.data, this.attachDataEventHandler.bind(this));
+    }
+    } catch(e) {
+      console.error(e.stack);
+      console.error(e);
+    }
+  };
+  SinkRepresentation.prototype.attachDataEventHandler = function (handler, eventname) {
+    var de = this.dataEvents[eventname];
+    if (!de) {
+      return;
+    }
+    return de.attach(handler);
   };
 
   function addNameTo(name, namedhasharry) {
@@ -229,7 +255,7 @@ function createUserRepresentation(execlib) {
     }
     //console.log(subsinkinfoextras, '+', subsinkinfo.name, '=>', subsubsinkinfoextras);
     if (!subsink) {
-      subsink = new SinkRepresentation();
+      subsink = new SinkRepresentation(this.subSinkEventHandlers(subsinkinfo.name));
       this.subsinks[subsinkinfo.name] = subsink;
     }
     activationobj.subinits.push({
@@ -241,9 +267,18 @@ function createUserRepresentation(execlib) {
   SinkRepresentation.prototype.subSinkActivated = function (activationobj, subsink, subsubsinkinfoextras, subsubsink) {
     activationobj.add(subsink.setSink(subsubsink, subsubsinkinfoextras));
   };
+  SinkRepresentation.prototype.subSinkEventHandlers = function (subsinkname) {
+    if (!this.eventHandlers) {
+      return;
+    }
+    if (!this.eventHandlers.sub) {
+      return;
+    }
+    return this.eventHandlers.sub[subsinkname];
+  };
 
-  function UserSinkRepresentation(){
-    SinkRepresentation.call(this);
+  function UserSinkRepresentation(eventhandlers){
+    SinkRepresentation.call(this, eventhandlers);
   }
   lib.inherit(UserSinkRepresentation, SinkRepresentation);
 
