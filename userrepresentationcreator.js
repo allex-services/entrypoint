@@ -165,6 +165,7 @@ function createUserRepresentation(execlib) {
   };
 
   function SinkRepresentation(eventhandlers){
+    this.sink = null;
     this.state = new lib.Map();
     this.data = [];
     this.subsinks = {};
@@ -184,6 +185,7 @@ function createUserRepresentation(execlib) {
     this.data = null;
     this.state.destroy();
     this.state = null;
+    this.sink = null;
   };
   SinkRepresentation.prototype.purge = function () {
     lib.traverseShallow(this.subsinks,function (subsink) {
@@ -246,6 +248,7 @@ function createUserRepresentation(execlib) {
   SinkRepresentation.prototype.setSink = function (sink, sinkinfoextras) {
     var d = q.defer(),
       subsinkinfoextras = [];
+    this.sink = sink;
     if (!sink) {
     } else {
       if (sinkinfoextras && !sink.sinkInfo) {
