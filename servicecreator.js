@@ -220,6 +220,22 @@ function createEntryPointService(execlib, ParentServicePack) {
       res.end.bind(res)
     );
   };
+  EntryPointService.prototype.letMeOut = function (url, req, res) {
+    if(url && url.query && url.query.session){
+      if (this.sessionsWriterSink) {
+        console.log('calling sessionsWriterSink to delete', url.query.session);
+        this.sessionsWriterSink.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
+      } else {
+        if (this.destroyed) {
+          lib.runNext(this.letMeOut.bind(this, url, req, res), 100);
+        } else {
+          res.end();
+        }
+      }
+    } else {
+      res.end();
+    }
+  };
   EntryPointService.prototype.register = function (url, req, res) {
     this.extractRequestParams(url, req).then(
       this.onRegisterParams.bind(this, res)

@@ -165,10 +165,9 @@ function createUserRepresentation(execlib) {
   };
 
   function SinkRepresentation(eventhandlers){
-    this.state = new lib.Map;
+    this.state = new lib.Map();
     this.data = [];
     this.subsinks = {};
-    this.sink = null;
     this.dataEvents = new DataEventConsumers();
     console.log('eventhandlers', eventhandlers);
     this.eventHandlers = eventhandlers;
@@ -181,11 +180,35 @@ function createUserRepresentation(execlib) {
       this.dataEvents.destroy();
     }
     this.dataEvents = null;
-    this.sink = null;
     this.subsinks = null;
     this.data = null;
     this.state.destroy();
     this.state = null;
+  };
+  SinkRepresentation.prototype.purge = function () {
+    lib.traverseShallow(this.subsinks,function (subsink) {
+      subsink.purge();
+      subsink.destroy();
+    });
+    this.subsinks = {};
+    this.purgeState();
+    this.purgeData();
+  };
+  SinkRepresentation.prototype.purgeState = function () {
+    if (this.state) {
+      //here this.state should be recursively traversed for each and every element
+      //so that each element is cleanly deleted with proper event being fired
+      this.state.destroy();
+    }
+    this.state = new lib.Map();
+  };
+  SinkRepresentation.prototype.purgeData = function () {
+    var rdf = this.dataEvents.onRecordDeletion.fire_er();
+    this.data.forEach(function(record){
+      rdf(record);
+    });
+    this.dataEvents.onDelete.fire(null);
+    this.data = [];
   };
   SinkRepresentation.prototype.connectEventHandlers = function (eventhandlers) {
     if (!eventhandlers) {
@@ -223,7 +246,6 @@ function createUserRepresentation(execlib) {
   SinkRepresentation.prototype.setSink = function (sink, sinkinfoextras) {
     var d = q.defer(),
       subsinkinfoextras = [];
-    this.sink = sink;
     if (!sink) {
     } else {
       if (sinkinfoextras && !sink.sinkInfo) {
@@ -245,7 +267,7 @@ function createUserRepresentation(execlib) {
       if(sink.recordDescriptor){
         taskRegistry.run('materializeData',this.produceDataMaterializationPropertyHash(sink));
       }
-      this.handleSinkInfo(d, subsinkinfoextras);
+      this.handleSinkInfo(d, sink, subsinkinfoextras);
     }
     return d.promise;
   };
@@ -256,19 +278,19 @@ function createUserRepresentation(execlib) {
     console.log('returning',ret);
     return ret;
   };
-  SinkRepresentation.prototype.handleSinkInfo = function (defer, subsinkinfoextras) {
+  SinkRepresentation.prototype.handleSinkInfo = function (defer, sink, subsinkinfoextras) {
     var sinkstate = taskRegistry.run('materializeState',{
-        sink: this.sink,
+        sink: sink,
         data: this.state
         }),
         activationobj;
-    if (!(this.sink && this.sink.sinkInfo)) {
+    if (!(sink && sink.sinkInfo)) {
       defer.resolve(0);
       return;
     }
     activationobj = new SinkActivationMonitor(defer);
-    if (this.sink.sinkInfo) {
-      this.sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
+    if (sink.sinkInfo) {
+      sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
     } else if (subsinkinfoextras) {
       console.log('but still',subsinkinfoextras);
     }
