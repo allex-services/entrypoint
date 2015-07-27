@@ -135,6 +135,34 @@ function createUserRepresentation(execlib) {
       onRecordDeletion: this.onRecordDeletion.fire_er()
     };
   };
+  DataEventConsumers.prototype.monitorDataForGui = function (cb) {
+    return new DataMonitorForGui(this, cb);
+  };
+
+  function DataMonitorForGui(dataeventconsumers, cb){
+    this.onInitiatedListener = dataeventconsumers.onInitiated.attach(cb);
+    this.onNewRecordListener = dataeventconsumers.onNewRecord.attach(cb);
+    this.onUpdateListener = dataeventconsumers.onUpdate.attach(cb);
+    this.onDeleteListener = dataeventconsumers.onDelete.attach(cb);
+  }
+  DataMonitorForGui.prototype.destroy = function () {
+    if (this.onInitiatedListener) {
+      this.onInitiatedListener.destroy();
+    }
+    this.onInitiatedListener = null;
+    if (this.onNewRecordListener) {
+      this.onNewRecordListener.destroy();
+    }
+    this.onNewRecordListener = null;
+    if (this.onUpdateListener) {
+      this.onUpdateListener.destroy();
+    }
+    this.onUpdateListener = null;
+    if (this.onDeleteListener) {
+      this.onDeleteListener.destroy();
+    }
+    this.onDeleteListener = null;
+  };
 
   function SinkRepresentation(eventhandlers){
     this.state = new lib.Map;
@@ -179,6 +207,9 @@ function createUserRepresentation(execlib) {
       return;
     }
     return de.attach(handler);
+  };
+  SinkRepresentation.prototype.monitorDataForGui = function (cb) {
+    return this.dataEvents.monitorForGui(cb);
   };
 
   function addNameTo(name, namedhasharry) {
