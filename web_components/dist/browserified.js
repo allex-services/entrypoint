@@ -1,3 +1,203 @@
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+ALLEX.execSuite.registry.add('allex_entrypointservice',require('./clientside')(ALLEX, ALLEX.execSuite.registry.get('allex_httpservice')));
+
+},{"./clientside":2}],2:[function(require,module,exports){
+function createClientSide(execlib,ParentServicePack) {
+  'use strict';
+  execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
+  return {
+    SinkMap: require('./sinkmapcreator')(execlib, ParentServicePack),
+    Tasks: [{
+      name: 'letMeIn',
+      klass: require('./tasks/letMeIn')(execlib)
+    }]
+  };
+}
+
+module.exports = createClientSide;
+
+},{"./sinkmapcreator":5,"./tasks/letMeIn":8,"./userrepresentationcreator":9}],3:[function(require,module,exports){
+module.exports = {
+};
+
+},{}],4:[function(require,module,exports){
+arguments[4][3][0].apply(exports,arguments)
+},{"dup":3}],5:[function(require,module,exports){
+function sinkMapCreator(execlib,ParentServicePack){
+  'use strict';
+  var sinkmap = new (execlib.lib.Map), ParentSinkMap = ParentServicePack.SinkMap;
+  sinkmap.add('service',require('./sinks/servicesinkcreator')(execlib,ParentSinkMap.get('service')));
+  sinkmap.add('user',require('./sinks/usersinkcreator')(execlib,ParentSinkMap.get('user')));
+  
+  return sinkmap;
+}
+
+module.exports = sinkMapCreator;
+
+},{"./sinks/servicesinkcreator":6,"./sinks/usersinkcreator":7}],6:[function(require,module,exports){
+function createServiceSink(execlib, ParentSink) {
+  'use strict';
+  if(!ParentSink){
+    ParentSink = execlib.execSuite.registry.get('.').SinkMap.get('user');
+  }
+
+  function ServiceSink(prophash, client) {
+    ParentSink.call(this, prophash, client);
+  }
+  ParentSink.inherit(ServiceSink, require('../methoddescriptors/serviceuser'));
+  ServiceSink.prototype.__cleanUp = function() {
+    ParentSink.prototype.__cleanUp.call(this);
+  };
+  return ServiceSink;
+}
+
+module.exports = createServiceSink;
+
+},{"../methoddescriptors/serviceuser":3}],7:[function(require,module,exports){
+function createUserSink(execlib, ParentSink) {
+  'use strict';
+  if(!ParentSink){
+    ParentSink = execlib.execSuite.registry.get('.').SinkMap.get('user');
+  }
+
+  function UserSink(prophash, client) {
+    ParentSink.call(this, prophash, client);
+  }
+  ParentSink.inherit(UserSink, require('../methoddescriptors/user'));
+  UserSink.prototype.__cleanUp = function() {
+    ParentSink.prototype.__cleanUp.call(this);
+  };
+  return UserSink;
+}
+
+module.exports = createUserSink;
+
+},{"../methoddescriptors/user":4}],8:[function(require,module,exports){
+function createLetMeInTask (execlib) {
+  'use strict';
+  var lib = execlib.lib,
+    q = lib.q,
+    execSuite = execlib.execSuite,
+    Task = execSuite.Task,
+    taskRegistry = execSuite.taskRegistry;
+
+  function LetMeInTask (prophash) {
+    console.log('LetMeInTask', prophash);
+    Task.call(this, prophash);
+    this.sinkname = prophash.sinkname || 'EntryPoint';
+    this.identity = prophash.identity;
+    this.session = prophash.session;
+    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
+    this.cb = prophash.cb;
+    this.sinkinfoextras = prophash.sinkinfoextras;
+    this.ipaddress = null;
+  }
+  lib.inherit(LetMeInTask, Task);
+  LetMeInTask.prototype.destroy = function () {
+    this.ipaddress = null;
+    this.sinkinfoextras = null;
+    this.cb = null;
+    this.representation.destroy();
+    this.representation = null;
+    this.session = null;
+    this.identity = null;
+    this.sinkname = null;
+    Task.prototype.destroy.call(this);
+  };
+  LetMeInTask.prototype.go = function () {
+    if(!this.sinkname){
+      return;
+    }
+    taskRegistry.run('findAndRun', {
+      program: {
+        sinkname: this.sinkname,
+        identity: {name: 'user', role: 'user'},
+        task: {
+          name: this.onSink.bind(this),
+          propertyhash: {
+            'ipaddress': 'fill yourself'
+          }
+        }
+      }
+    });
+  };
+  LetMeInTask.prototype.onSink = function (sinkinfo) {
+    if(!sinkinfo.sink){
+      return;
+    }
+    taskRegistry.run('readState', {
+      state: taskRegistry.run('materializeState', {
+        sink: sinkinfo.sink
+      }),
+      name: 'port',
+      cb: this.onEntryPointPort.bind(this,sinkinfo)
+    });
+  };
+  LetMeInTask.prototype.onEntryPointPort = function (sinkinfo, port) {
+    sinkinfo.sink.destroy();
+    try {
+      lib.request('http://'+sinkinfo.ipaddress+':'+port+'/letMeIn',{
+        onComplete: this.onLetMeIn.bind(this),
+        parameters: this.identity
+      });
+    }
+    catch (e) {
+      console.error(e.stack);
+      console.error(e);
+    }
+  };
+  LetMeInTask.prototype.onLetMeIn = function (responseobj) {
+    if (!(responseobj && responseobj.data)) {
+      this.cb(null);
+    } else {
+      var response, taskobj = {task:null};
+      try {
+        response = JSON.parse(responseobj.data);
+        this.ipaddress = response.ipaddress;
+        taskobj.task = taskRegistry.run('acquireSink',{
+          connectionString: 'ws://'+response.ipaddress+':'+response.port,
+          session: response.session,
+          onSink: this.onTargetSink.bind(this, taskobj)
+        });
+      } catch (e) {
+        console.error(responseobj,'=>',e.stack);
+        console.error(e);
+        this.cb(null);
+      }
+    }
+  };
+  LetMeInTask.prototype.onTargetSink = function (taskobj, sink) {
+    if(!sink) {
+      return;
+    }
+    lib.runNext(taskobj.task.destroy.bind(taskobj.task));
+    taskobj.task = null;
+    taskobj = null;
+    taskRegistry.run('acquireUserServiceSink', {
+      sink: sink,
+      cb: this.onUserServiceSink.bind(this)
+    });
+  };
+  LetMeInTask.prototype.onUserServiceSink = function (sink) {
+    this.representation.setSink(sink, this.sinkinfoextras).done(
+      this.finalize.bind(this, sink)
+    );
+  };
+  LetMeInTask.prototype.finalize = function (sink) {
+    this.cb({
+      task: this,
+      sink: sink,
+      taskRegistry: taskRegistry
+    });
+  };
+  LetMeInTask.prototype.compulsoryConstructionProperties = ['cb'];
+
+  return LetMeInTask;
+}
+
+module.exports = createLetMeInTask;
+
+},{}],9:[function(require,module,exports){
 function createUserRepresentation(execlib) {
   'use strict';
   var lib = execlib.lib,
@@ -317,3 +517,5 @@ function createUserRepresentation(execlib) {
 }
 
 module.exports = createUserRepresentation;
+
+},{}]},{},[1]);
