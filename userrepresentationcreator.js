@@ -203,12 +203,13 @@ function createUserRepresentation(execlib) {
     this.state = new lib.Map();
   };
   SinkRepresentation.prototype.purgeData = function () {
-    var rdf = this.dataEvents.onRecordDeletion.fire_er();
-    this.data.forEach(function(record){
-      rdf(record);
-    });
-    this.dataEvents.onDelete.fire(null);
-    this.data = [];
+    var wasfull = this.data.length>0;
+    while (this.data.length) {
+      this.dataEvents.onRecordDeletion.fire(this.data.pop());
+    }
+    if (wasfull) {
+      this.dataEvents.onDelete.fire(null);
+    }
   };
   SinkRepresentation.prototype.connectEventHandlers = function (eventhandlers) {
     if (!eventhandlers) {
