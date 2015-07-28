@@ -170,7 +170,6 @@ function createUserRepresentation(execlib) {
     this.data = [];
     this.subsinks = {};
     this.dataEvents = new DataEventConsumers();
-    console.log('eventhandlers', eventhandlers);
     this.eventHandlers = eventhandlers;
     this.connectEventHandlers(eventhandlers);
   }
@@ -279,7 +278,6 @@ function createUserRepresentation(execlib) {
     var ret = this.dataEvents.listenerPack();
     ret.sink = sink;
     ret.data = this.data;
-    console.log('returning',ret);
     return ret;
   };
   SinkRepresentation.prototype.handleSinkInfo = function (defer, sink, subsinkinfoextras) {
@@ -295,9 +293,9 @@ function createUserRepresentation(execlib) {
     activationobj = new SinkActivationMonitor(defer);
     if (sink.sinkInfo) {
       sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
-    } else if (subsinkinfoextras) {
+    }/* else if (subsinkinfoextras) {
       console.log('but still',subsinkinfoextras);
-    }
+    }*/
     activationobj.run(sinkstate);
   };
   SinkRepresentation.prototype.subSinkInfo2SubInit = function (activationobj, subsinkinfoextras, subsinkinfo) {

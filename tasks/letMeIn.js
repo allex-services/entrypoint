@@ -7,7 +7,6 @@ function createLetMeInTask (execlib) {
     taskRegistry = execSuite.taskRegistry;
 
   function LetMeInTask (prophash) {
-    console.log('LetMeInTask', prophash);
     Task.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
