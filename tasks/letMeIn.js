@@ -103,9 +103,14 @@ function createLetMeInTask (execlib) {
     });
   };
   LetMeInTask.prototype.onUserServiceSink = function (sink) {
+    try {
     this.representation.setSink(sink, this.sinkinfoextras).done(
       this.finalize.bind(this, sink)
     );
+    } catch (e) {
+      console.error(e.stack);
+      console.error(e);
+    }
   };
   LetMeInTask.prototype.finalize = function (sink) {
     this.cb({

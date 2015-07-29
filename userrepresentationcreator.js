@@ -3,7 +3,8 @@ function createUserRepresentation(execlib) {
   var lib = execlib.lib,
     q = lib.q,
     execSuite = execlib.execSuite,
-    taskRegistry = execSuite.taskRegistry;
+    taskRegistry = execSuite.taskRegistry,
+    ADS = execSuite.ADS;
 
   function SinkActivationMonitor(defer){
     this.defer = defer;
@@ -43,11 +44,140 @@ function createUserRepresentation(execlib) {
     }
   };
 
-  function EventConsumer(eventconsumers, cb){
+  function StateEventConsumer (consumers, cb) {
+    this.consumers = consumers;
+    this.activatorreference = null;
+    this.deactivatorreference = null;
+    this.setterreference = null;
+    this.rawsetterreference = null;
+    if ('function' === typeof cb) {
+      this.rawsetterreference = this.consumers.rawsetterhandlers.add(cb);
+    }
+  }
+  StateEventConsumer.prototype.destroy = function () {
+    if (!this.consumers) {
+      return;
+    }
+    if (this.activatorreference) {
+      this.consumers.activatorhandlers.removeOne(this.activatorreference);
+    }
+    this.activatorreference = null;
+    if (this.deactivatorreference) {
+      this.consumers.deactivatorhandlers.removeOne(this.deactivatorreference);
+    }
+    this.deactivatorreference = null;
+    if (this.setterreference) {
+      this.consumers.setterhandlers.removeOne(this.setterreference);
+    }
+    this.setterreference = null;
+    if (this.rawsetterreference) {
+      this.consumers.rawsetterhandlers.removeOne(this.rawsetterreference);
+    }
+    this.rawsetterreference = null;
+  };
+
+  function StateEventConsumers(stateeventconsumers, path) {
+    lib.Destroyable.call(this);
+    this.sec = stateeventconsumers;
+    this.path = path;
+    this.ads = this.extendTo(ADS.listenToScalar(this.path.split('/'), {
+      activator: this._activated.bind(this),
+      deactivator: this._deactivated.bind(this),
+      setter: this._set.bind(this),
+      rawsetter: this._setRaw.bind(this)
+    }));
+    this.activatorhandlers = new lib.SortedList();
+    this.deactivatorhandlers = new lib.SortedList();
+    this.setterhandlers = new lib.SortedList();
+    this.rawsetterhandlers = new lib.SortedList();
+  }
+  lib.inherit(StateEventConsumers, lib.Destroyable);
+  StateEventConsumers.prototype.__cleanUp = function () {
+    if (!this.sec) {
+      return;
+    }
+    this.sec.consumers.remove(this.path);
+    lib.containerDestroyAll(this.activatorhandlers);
+    this.activatorhandlers.destroy();
+    this.activatorhandlers = null;
+    lib.containerDestroyAll(this.deactivatorhandlers);
+    this.deactivatorhandlers.destroy();
+    this.deactivatorhandlers = null;
+    lib.containerDestroyAll(this.setterhandlers);
+    this.setterhandlers.destroy();
+    this.setterhandlers = null;
+    lib.containerDestroyAll(this.rawsetterhandlers);
+    this.rawsetterhandlers.destroy();
+    this.rawsetterhandlers = null;
+    this.ads = null;
+    this.path = null;
+    this.sec = null;
+    lib.Destroyable.prototype.__cleanUp.call(this);
+  };
+  StateEventConsumers.prototype.add = function (cb) {
+    return new StateEventConsumer(this, cb);
+  };
+  StateEventConsumers.prototype._activated = function () {
+  };
+  StateEventConsumers.prototype._deactivated = function () {
+  };
+  StateEventConsumers.prototype._set = function () {
+  };
+  StateEventConsumers.prototype._setRaw = function () {
+    var args = arguments;
+    this.rawsetterhandlers.traverse(function(cb){
+      cb.apply(null,args);
+    });
+  };
+
+  function StateEventConsumersListener(stateeventconsumerpack, listenerhash) {
+    this.secp = stateeventconsumerpack;
+    this.listeners = [];
+    lib.traverseShallow(listenerhash, this.addConsumer.bind(this));
+  }
+  StateEventConsumersListener.prototype.destroy = function () {
+    lib.arryDestroyAll(this.listeners);
+    this.listeners = null;
+  };
+  StateEventConsumersListener.prototype.addConsumer = function (cb, path) {
+    if (path.charAt(0) === '/'){
+      path = path.substring(1);
+    }
+    var consumer = this.secp.consumers.get(path);
+    if (!consumer) {
+      consumer = new StateEventConsumers(this, path);
+      this.secp.consumers.add(path, consumer);
+    }
+    this.listeners.push(consumer.add(cb));
+  };
+
+  function StateEventConsumerPack(listenerhash) {
+    this.consumers = new lib.Map();
+    this.addConsumers(listenerhash);
+  }
+  StateEventConsumerPack.prototype.destroy = function () {
+    if (!this.consumers) {
+      return;
+    }
+    lib.containerDestroyAll(this.consumers);
+    this.consumers.destroy();
+    this.consumers = null;
+  };
+  StateEventConsumerPack.prototype.addConsumers = function (listenerhash) {
+    return new StateEventConsumersListener(this, listenerhash);
+  };
+  StateEventConsumerPack.prototype.attachTo = function (sink) {
+    this.consumers.traverse(function(listeners, path){
+      sink.state.setSink(listeners.ads);
+    });
+  };
+
+
+  function DataEventConsumer(eventconsumers, cb){
     this.ecs = eventconsumers;
     this.subscription = this.ecs.consumers.add(cb);
   }
-  EventConsumer.prototype.destroy = function () {
+  DataEventConsumer.prototype.destroy = function () {
     if (this.subscription) {
       this.ecs.consumers.removeOne(this.subscription);
     }
@@ -55,25 +185,25 @@ function createUserRepresentation(execlib) {
     this.ecs = null;
   };
 
-  function EventConsumers(){
+  function DataEventConsumers(){
     this.consumers = new lib.SortedList();
     this.listeners = null;
     this.hookcollection = null;
   }
-  EventConsumers.prototype.destroy = function () {
+  DataEventConsumers.prototype.destroy = function () {
     this.hookcollection = null;
     this.consumers.destroy();
     this.consumers = null;
     this.detach();
   };
-  EventConsumers.prototype.attachTo = function (hookcollection) {
+  DataEventConsumers.prototype.attachTo = function (hookcollection) {
     this.detach();
     this.hookcollection = hookcollection;
     this.listeners = this.consumers.map(function(cons){
       return hookcollection.attach(cons);
     });
   };
-  EventConsumers.prototype.detach = function () { //detach is "detach self from hook given in attachTo
+  DataEventConsumers.prototype.detach = function () { //detach is "detach self from hook given in attachTo
     if(!this.listeners){
       return;
     }
@@ -82,32 +212,32 @@ function createUserRepresentation(execlib) {
     this.listeners.destroy();
     this.listeners = null;
   };
-  EventConsumers.prototype.attach = function (cb) { //attach is "remember this cb for later attachTo"
+  DataEventConsumers.prototype.attach = function (cb) { //attach is "remember this cb for later attachTo"
     if(this.hookcollection){
       this.listeners.push(this.hookcollection.attach(cb));
     }
-    return new EventConsumer(this,cb);
+    return new DataEventConsumer(this,cb);
   };
-  EventConsumers.prototype.fire = function () {
+  DataEventConsumers.prototype.fire = function () {
     var args = arguments;
     this.consumers.traverse(function (l) {
       l.apply(null,args);
     });
   };
-  EventConsumers.prototype.fire_er = function () {
+  DataEventConsumers.prototype.fire_er = function () {
     return this.fire.bind(this);
   };
 
-  function DataEventConsumers(){
-    this.onInitiated = new EventConsumers();
-    this.onRecordCreation = new EventConsumers();
-    this.onNewRecord = new EventConsumers();
-    this.onUpdate = new EventConsumers();
-    this.onRecordUpdate = new EventConsumers();
-    this.onDelete = new EventConsumers();
-    this.onRecordDeletion = new EventConsumers();
+  function DataEventConsumerPack(){
+    this.onInitiated = new DataEventConsumers();
+    this.onRecordCreation = new DataEventConsumers();
+    this.onNewRecord = new DataEventConsumers();
+    this.onUpdate = new DataEventConsumers();
+    this.onRecordUpdate = new DataEventConsumers();
+    this.onDelete = new DataEventConsumers();
+    this.onRecordDeletion = new DataEventConsumers();
   }
-  DataEventConsumers.prototype.destroy = function () {
+  DataEventConsumerPack.prototype.destroy = function () {
     this.onInitiated.destroy();
     this.onInitiated = null;
     this.onRecordCreation.destroy();
@@ -123,7 +253,7 @@ function createUserRepresentation(execlib) {
     this.onRecordDeletion.destroy();
     this.onRecordDeletion = null;
   };
-  DataEventConsumers.prototype.listenerPack = function () {
+  DataEventConsumerPack.prototype.listenerPack = function () {
     var orc = this.onRecordCreation;
     return {
       onInitiated: this.onInitiated.fire_er(),
@@ -135,7 +265,7 @@ function createUserRepresentation(execlib) {
       onRecordDeletion: this.onRecordDeletion.fire_er()
     };
   };
-  DataEventConsumers.prototype.monitorForGui = function (cb) {
+  DataEventConsumerPack.prototype.monitorForGui = function (cb) {
     return new DataMonitorForGui(this, cb);
   };
 
@@ -169,7 +299,8 @@ function createUserRepresentation(execlib) {
     this.state = new lib.Map();
     this.data = [];
     this.subsinks = {};
-    this.dataEvents = new DataEventConsumers();
+    this.stateEvents = new StateEventConsumerPack();
+    this.dataEvents = new DataEventConsumerPack();
     this.eventHandlers = eventhandlers;
     this.connectEventHandlers(eventhandlers);
   }
@@ -180,6 +311,10 @@ function createUserRepresentation(execlib) {
       this.dataEvents.destroy();
     }
     this.dataEvents = null;
+    if (this.stateEvents) {
+      this.stateEvents.destroy();
+    }
+    this.stateEvents = null;
     this.subsinks = null;
     this.data = null;
     this.state.destroy();
@@ -217,8 +352,10 @@ function createUserRepresentation(execlib) {
       return;
     }
     try {
+    if (eventhandlers.state) {
+      this.stateEvents.addConsumers(eventhandlers.state);
+    }
     if (eventhandlers.data) {
-      var de = this.dataEvents;
       lib.traverseShallow(eventhandlers.data, this.attachDataEventHandler.bind(this));
     }
     } catch(e) {
@@ -235,6 +372,15 @@ function createUserRepresentation(execlib) {
   };
   SinkRepresentation.prototype.monitorDataForGui = function (cb) {
     return this.dataEvents.monitorForGui(cb);
+  };
+  SinkRepresentation.prototype.monitorStateForGui = function (listenerhash) {
+    /*
+    listenerhash: {
+      statepath1: cb1,
+      statepath2: [cb2, cb3]
+    }
+    */
+    this.stateEvents.addConsumers(listenerhash);
   };
 
   function addNameTo(name, namedhasharry) {
@@ -267,10 +413,11 @@ function createUserRepresentation(execlib) {
         });
       }
       //console.log('finally', sink.sinkInfo);
+      this.handleSinkInfo(d, sink, subsinkinfoextras);
+      this.stateEvents.attachTo(sink);
       if(sink.recordDescriptor){
         taskRegistry.run('materializeData',this.produceDataMaterializationPropertyHash(sink));
       }
-      this.handleSinkInfo(d, sink, subsinkinfoextras);
     }
     return d.promise;
   };
