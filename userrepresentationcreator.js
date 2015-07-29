@@ -80,7 +80,7 @@ function createUserRepresentation(execlib) {
     lib.Destroyable.call(this);
     this.sec = stateeventconsumers;
     this.path = path;
-    this.ads = this.extendTo(ADS.listenToScalar(this.path.split('/'), {
+    this.ads = this.extendTo(ADS.listenToScalar([this.path], {
       activator: this._activated.bind(this),
       deactivator: this._deactivated.bind(this),
       setter: this._set.bind(this),
