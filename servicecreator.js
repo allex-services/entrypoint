@@ -195,7 +195,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     if(url && url.query && url.query.session){
       this.checkSession(url.query.session).done(
         this.doLetHimIn.bind(this, res),
-        res.end.bind(res)
+        res.end.bind(res,'')
       );
       return;
     }
@@ -217,7 +217,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     //now, introduceSession to a __chosen__ target. __chosen__
     this.chooseTarget().done(
       this.onTargetChosen.bind(this,res,identityobj),
-      res.end.bind(res)
+      res.end.bind(res,'')
     );
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
