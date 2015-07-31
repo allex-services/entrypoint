@@ -4,6 +4,7 @@ function createTargetContainer(execlib){
     q = lib.q;
 
   function TargetContainer(sinkname,sinkinfo){
+    console.log('single target found',sinkinfo.ipaddress,':',sinkinfo.wsport);
     this.name = sinkname;
     this.sink = sinkinfo.sink;
     this.address = sinkinfo.ipaddress;
@@ -13,7 +14,8 @@ function createTargetContainer(execlib){
     sinkinfo.ipaddress = null;
   }
   TargetContainer.prototype.destroy = function(){
-    this.ipaddress = null;
+    this.address = null;
+    this.port = null;
     if(this.sink){
       this.sink.destroy();
     }

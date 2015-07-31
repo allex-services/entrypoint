@@ -359,7 +359,16 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
-    console.log('single target found',sinkinfo);
+    taskRegistry.run('natThis', {
+      iaddress: sinkinfo.ipaddress,
+      iport: sinkinfo.wsport,
+      cb: this.onSingleTargetNatted.bind(this, sinkname, sinkinfo),
+      singleshot: true
+    });
+  };
+  EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
+    sinkinfo.ipaddress = eaddress;
+    sinkinfo.wsport = eport;
     if(sinkinfo.sink){
       this.targets.add(sinkname,new TargetContainer(sinkname,sinkinfo));
     }else{
