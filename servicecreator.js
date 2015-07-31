@@ -223,7 +223,7 @@ function createEntryPointService(execlib, ParentServicePack) {
   EntryPointService.prototype.letMeOut = function (url, req, res) {
     if(url && url.query && url.query.session){
       if (this.sessionsWriterSink) {
-        console.log('calling sessionsWriterSink to delete', url.query.session);
+        //console.log('calling sessionsWriterSink to delete', url.query.session);
         this.sessionsWriterSink.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
       } else {
         if (this.destroyed) {
@@ -263,7 +263,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.onRegisterFailed = function (res, result) {
-    console.log('register nok', result);
+    //console.log('register nok', result);
     res.end();
   };
   EntryPointService.prototype.usernameExists = function (url, req, res) {
@@ -359,6 +359,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
+    //console.log('going to nat',sinkinfo.ipaddress,':',sinkinfo.wsport);
     taskRegistry.run('natThis', {
       iaddress: sinkinfo.ipaddress,
       iport: sinkinfo.wsport,
@@ -367,6 +368,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
+    //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.wsport,'=>',eaddress,eport);
     sinkinfo.ipaddress = eaddress;
     sinkinfo.wsport = eport;
     if(sinkinfo.sink){

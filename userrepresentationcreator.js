@@ -438,6 +438,9 @@ function createUserRepresentation(execlib) {
       return;
     }
     activationobj = new SinkActivationMonitor(defer);
+    if (sink.remoteSinkNames) {
+      console.log('remote sink names', sink.remoteSinkNames);
+    }
     if (sink.sinkInfo) {
       sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
     }/* else if (subsinkinfoextras) {
