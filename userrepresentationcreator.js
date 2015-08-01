@@ -383,11 +383,18 @@ function createUserRepresentation(execlib) {
     this.stateEvents.addConsumers(listenerhash);
   };
 
-  function addNameTo(name, namedhasharry) {
-    if (!namedhasharry.some(function (nh) {
-      return nh.name === name;
-    })){
-      namedhasharry.push ({name: name});
+  function sinkInfoAppender(sink, subsinkinfoextras, sinkinfo) {
+    if (sinkinfo) {
+      if (sinkinfo.length===1) {
+        if (!sink.localSinkNames) {
+          sink.localSinkNames = [];
+        }
+        if (sink.localSinkNames.indexOf(sinkinfo[0])<0){
+          sink.localSinkNames.push(sinkinfo[0]);
+        }
+      } else {
+        subsinkinfoextras.push(sinkinfo);
+      }
     }
   }
 
@@ -397,22 +404,11 @@ function createUserRepresentation(execlib) {
     this.sink = sink;
     if (!sink) {
     } else {
-      if (sinkinfoextras && !sink.sinkInfo) {
-        sink.sinkInfo = [];
-      }
-      //console.log('at the beginning', sink.sinkInfo, '+', sinkinfoextras);
+      //console.log('at the beginning', sink.localSinkNames, '+', sinkinfoextras);
       if (sinkinfoextras) {
-        sinkinfoextras.forEach(function (sinkinfo) {
-          if (sinkinfo) {
-            if (sinkinfo.length===1) {
-              addNameTo(sinkinfo[0], sink.sinkInfo);
-            } else {
-              subsinkinfoextras.push(sinkinfo);
-            }
-          }
-        });
+        sinkinfoextras.forEach(sinkInfoAppender.bind(null, sink, subsinkinfoextras));
       }
-      //console.log('finally', sink.sinkInfo);
+      //console.log('finally', sink.localSinkNames);
       this.handleSinkInfo(d, sink, subsinkinfoextras);
       this.stateEvents.attachTo(sink);
       if(sink.recordDescriptor){
@@ -433,41 +429,46 @@ function createUserRepresentation(execlib) {
         data: this.state
         }),
         activationobj;
-    if (!(sink && sink.sinkInfo)) {
+    if (!sink) {
       defer.resolve(0);
       return;
     }
     activationobj = new SinkActivationMonitor(defer);
     if (sink.remoteSinkNames) {
       console.log('remote sink names', sink.remoteSinkNames);
+      sink.remoteSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, false, activationobj, subsinkinfoextras));
     }
-    if (sink.sinkInfo) {
-      sink.sinkInfo.forEach(this.subSinkInfo2SubInit.bind(this, activationobj, subsinkinfoextras));
-    }/* else if (subsinkinfoextras) {
-      console.log('but still',subsinkinfoextras);
-    }*/
+    if (sink.localSinkNames) {
+      sink.localSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, true, activationobj, subsinkinfoextras));
+    } else if (subsinkinfoextras) {
+      console.log('No localSinkNames on',sink.modulename,'but still have to do subsinkinfoextras',subsinkinfoextras);
+    }
     activationobj.run(sinkstate);
   };
-  SinkRepresentation.prototype.subSinkInfo2SubInit = function (activationobj, subsinkinfoextras, subsinkinfo) {
-    var subsink = this.subsinks[subsinkinfo.name], 
+  SinkRepresentation.prototype.subSinkInfo2SubInit = function (sswaitable, activationobj, subsinkinfoextras, ssname) {
+    var subsink = this.subsinks[ssname], 
       subsubsinkinfoextras = [];
     if (subsinkinfoextras) {
       subsinkinfoextras.forEach(function (esubsinkinfo) {
-        if (esubsinkinfo[0] === subsinkinfo.name) {
+        if (esubsinkinfo[0] === ssname) {
           subsubsinkinfoextras.push(esubsinkinfo.slice(1));
         }
       });
     }
-    //console.log(subsinkinfoextras, '+', subsinkinfo.name, '=>', subsubsinkinfoextras);
+    //console.log(subsinkinfoextras, '+', ssname, '=>', subsubsinkinfoextras);
     if (!subsink) {
-      subsink = new SinkRepresentation(this.subSinkEventHandlers(subsinkinfo.name));
-      this.subsinks[subsinkinfo.name] = subsink;
+      console.log('new subsink SinkRepresentation',ssname);
+      subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname));
+      this.subsinks[ssname] = subsink;
     }
-    activationobj.subinits.push({
-      name: subsinkinfo.name,
-      identity: {name: 'user', role: 'user'},
-      cb: this.subSinkActivated.bind(this, activationobj, subsink, subsubsinkinfoextras)//subsink.setSink.bind(subsink)
-    });
+    if (sswaitable) {
+      console.log('will wait for', ssname);
+      activationobj.subinits.push({
+        name: ssname,
+        identity: {name: 'user', role: 'user'},
+        cb: this.subSinkActivated.bind(this, activationobj, subsink, subsubsinkinfoextras)//subsink.setSink.bind(subsink)
+      });
+    }
   };
   SinkRepresentation.prototype.subSinkActivated = function (activationobj, subsink, subsubsinkinfoextras, subsubsink) {
     activationobj.add(subsink.setSink(subsubsink, subsubsinkinfoextras));
