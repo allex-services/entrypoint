@@ -440,7 +440,7 @@ function createUserRepresentation(execlib) {
     }
     if (sink.localSinkNames) {
       sink.localSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, true, activationobj, subsinkinfoextras));
-    } else if (subsinkinfoextras) {
+    } else if (subsinkinfoextras && subsinkinfoextras.length) {
       console.log('No localSinkNames on',sink.modulename,'but still have to do subsinkinfoextras',subsinkinfoextras);
     }
     activationobj.run(sinkstate);
