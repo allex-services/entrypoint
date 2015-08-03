@@ -457,12 +457,12 @@ function createUserRepresentation(execlib) {
     }
     //console.log(subsinkinfoextras, '+', ssname, '=>', subsubsinkinfoextras);
     if (!subsink) {
-      console.log('new subsink SinkRepresentation',ssname);
+      //console.log('new subsink SinkRepresentation',ssname);
       subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname));
       this.subsinks[ssname] = subsink;
     }
     if (sswaitable) {
-      console.log('will wait for', ssname);
+      //console.log('will wait for', ssname);
       activationobj.subinits.push({
         name: ssname,
         identity: {name: 'user', role: 'user'},
