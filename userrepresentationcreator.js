@@ -147,11 +147,16 @@ function createUserRepresentation(execlib) {
     if (!consumer) {
       consumer = new StateEventConsumers(this, path);
       this.secp.consumers.add(path, consumer);
+      //secp allready attachedTo
+      if(this.secp.sink){
+        this.secp.sink.state.setSink(consumer.ads);
+      }
     }
     this.listeners.push(consumer.add(cb));
   };
 
   function StateEventConsumerPack(listenerhash) {
+    this.sink = null;
     this.consumers = new lib.Map();
     this.addConsumers(listenerhash);
   }
@@ -162,11 +167,13 @@ function createUserRepresentation(execlib) {
     lib.containerDestroyAll(this.consumers);
     this.consumers.destroy();
     this.consumers = null;
+    this.sink = null;
   };
   StateEventConsumerPack.prototype.addConsumers = function (listenerhash) {
     return new StateEventConsumersListener(this, listenerhash);
   };
   StateEventConsumerPack.prototype.attachTo = function (sink) {
+    this.sink = sink;
     this.consumers.traverse(function(listeners, path){
       sink.state.setSink(listeners.ads);
     });
