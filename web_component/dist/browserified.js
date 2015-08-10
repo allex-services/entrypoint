@@ -230,6 +230,9 @@ function createUserRepresentation(execlib) {
     }
   };
   SinkActivationMonitor.prototype.resolve = function (result) {
+    if (!this.defer) {
+      return;
+    }
     this.defer.resolve(result);
     this.destroy();
   };

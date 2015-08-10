@@ -13,6 +13,9 @@ function createUserRepresentation(execlib) {
     this.sinksToWait = new lib.Map();
   }
   SinkActivationMonitor.prototype.destroy = function () {
+    if (this.defer) {
+      this.defer.resolve(null); //won't hurt if defer was already resolved/rejected
+    }
     this.sinksToWait.destroy();
     this.sinksToWait = null;
     this.subdefers = null;
@@ -26,6 +29,9 @@ function createUserRepresentation(execlib) {
     }
   };
   SinkActivationMonitor.prototype.resolve = function (result) {
+    if (!this.defer) {
+      return;
+    }
     this.defer.resolve(result);
     this.destroy();
   };
