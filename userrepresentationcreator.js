@@ -453,7 +453,6 @@ function createUserRepresentation(execlib) {
     try {
     var d = q.defer(),
       subsinkinfoextras = [];
-    console.log('setSink', sink ? 'with' : 'without');
     if (!sink) {
       console.log('no sink in setSink');
       this.sink = 0; //intentionally
