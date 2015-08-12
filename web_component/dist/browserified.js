@@ -217,6 +217,9 @@ function createUserRepresentation(execlib) {
     this.sinksToWait = new lib.Map();
   }
   SinkActivationMonitor.prototype.destroy = function () {
+    if (this.defer) {
+      this.defer.resolve(null); //won't hurt if defer was already resolved/rejected
+    }
     this.sinksToWait.destroy();
     this.sinksToWait = null;
     this.subdefers = null;
@@ -638,7 +641,7 @@ function createUserRepresentation(execlib) {
       statepath2: [cb2, cb3]
     }
     */
-    this.stateEvents.addConsumers(listenerhash);
+    return this.stateEvents.addConsumers(listenerhash);
   };
 
   function sinkInfoAppender(sink, subsinkinfoextras, sinkinfo) {

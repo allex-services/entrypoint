@@ -437,7 +437,7 @@ function createUserRepresentation(execlib) {
       statepath2: [cb2, cb3]
     }
     */
-    this.stateEvents.addConsumers(listenerhash);
+    return this.stateEvents.addConsumers(listenerhash);
   };
 
   function sinkInfoAppender(sink, subsinkinfoextras, sinkinfo) {
