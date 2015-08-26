@@ -355,7 +355,7 @@ function createUserRepresentation(execlib) {
 
   function SinkRepresentation(eventhandlers){
     this.sink = null;
-    this.state = new lib.Map();
+    this.state = new lib.ListenableMap();
     this.data = [];
     this.subsinks = {};
     this.stateEvents = new StateEventConsumerPack();
@@ -430,6 +430,12 @@ function createUserRepresentation(execlib) {
   SinkRepresentation.prototype.monitorDataForGui = function (cb) {
     return this.dataEvents.monitorForGui(cb);
   };
+  function setter(map, cb, cbname) {
+    var mapval = map.get(cbname);
+    if(lib.defined(mapval)){
+      cb(mapval);
+    }
+  }
   SinkRepresentation.prototype.monitorStateForGui = function (listenerhash) {
     /*
     listenerhash: {
@@ -437,6 +443,7 @@ function createUserRepresentation(execlib) {
       statepath2: [cb2, cb3]
     }
     */
+    lib.traverseShallow(listenerhash, setter.bind(null, this.state));
     return this.stateEvents.addConsumers(listenerhash);
   };
 
