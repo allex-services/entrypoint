@@ -209,6 +209,9 @@ function createUserRepresentation(execlib) {
     var path = []; 
     this.delitems = [];
     this._state.traverse(delSerializer.bind(null, path, this.delitems));
+    if (this.delitems.length !== this._state.count) {
+      throw new lib.Error('DELITEMS_CORRUPT', this.delitems.length+' !== '+this._state.count);
+    }
   }
   DataPurger.prototype.destroy = function () {
     this.delitems = null;
@@ -217,14 +220,13 @@ function createUserRepresentation(execlib) {
     this.state = null;
   };
   DataPurger.prototype.run = function () {
-    try {
     console.log('running delitems', this.delitems);
     this.delitems.forEach(this.runItem.bind(this));
-    lib.runNext(this.destroy.bind(this));
-    } catch(e) {
-      console.error(e.stack);
-      console.error(e);
+    if (this._state.count>0) {
+      console.log('_state is still not empty');
+      throw new lib.Error('_STATE_STILL_NOT_EMPTY', this._state.count+' items in _state still exist');
     }
+    lib.destroyASAP(this);
   };
   DataPurger.prototype.runItem = function (delitem) {
     this._state.remove(delitem.p[0]);
@@ -381,6 +383,7 @@ function createUserRepresentation(execlib) {
     this.sink = null;
   };
   SinkRepresentation.prototype.purge = function () {
+    console.log('purging');
     lib.traverseShallow(this.subsinks,function (subsink) {
       subsink.purge();
       //subsink.destroy(); //this looks like a baad idea
@@ -466,14 +469,13 @@ function createUserRepresentation(execlib) {
     try {
     var d = q.defer(),
       subsinkinfoextras = [];
+    if (this.sink) {
+      this.purge();
+    }
     if (!sink) {
       console.log('no sink in setSink');
       this.sink = 0; //intentionally
     } else {
-      if (this.sink === 0) {
-        console.log('purging');
-        this.purge();
-      }
       this.sink = sink;
       //console.log('at the beginning', sink.localSinkNames, '+', sinkinfoextras);
       if (sinkinfoextras) {
