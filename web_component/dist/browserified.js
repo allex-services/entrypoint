@@ -594,7 +594,7 @@ function createUserRepresentation(execlib) {
     });
     //this.subsinks = {}; //this looks like a baad idea...
     this.purgeState();
-    this.purgeData();
+    //this.purgeData();
   };
   SinkRepresentation.prototype.purgeState = function () {
     var dp = new DataPurger(this.state);
@@ -716,8 +716,8 @@ function createUserRepresentation(execlib) {
     }
     activationobj = new SinkActivationMonitor(defer);
     if (sink.remoteSinkNames) {
-      console.log('remote sink names', sink.remoteSinkNames);
-      sink.remoteSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, false, activationobj, subsinkinfoextras));
+      //console.log('remote sink names', sink.remoteSinkNames);
+      //sink.remoteSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, false, activationobj, subsinkinfoextras));
     }
     if (sink.localSinkNames) {
       sink.localSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, true, activationobj, subsinkinfoextras));
