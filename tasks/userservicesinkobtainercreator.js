@@ -43,35 +43,28 @@ function createUserServiceSinkObtainer (execlib) {
   };
   UserServiceSinkObtainerTask.prototype.onEntryPointPort = function (sinkinfo, port) {
     sinkinfo.sink.destroy();
-    try {
-      lib.request('http://'+sinkinfo.ipaddress+':'+port+'/letMeIn',{
-        onComplete: this.onLetMeIn.bind(this),
-        parameters: this.identity
-      });
-    }
-    catch (e) {
-      console.error(e.stack);
-      console.error(e);
-    }
+    this.goForLetMeIn(sinkinfo.ipaddress, port);
+  };
+  UserServiceSinkObtainerTask.prototype.goForLetMeIn = function (address, port) {
+    lib.request('http://'+address+':'+port+'/letMeIn',{
+      onComplete: this.onLetMeIn.bind(this),
+      parameters: this.identity
+    });
   };
   UserServiceSinkObtainerTask.prototype.onLetMeIn = function (responseobj) {
     if (!(responseobj && responseobj.data)) {
+      console.log('bad login', this.identity);
       this.cb(null);
+      this.destroy();
     } else {
       var response, taskobj = {task:null};
-      try {
         response = JSON.parse(responseobj.data);
         this.ipaddress = response.ipaddress;
-        taskobj.task = taskRegistry.run('acquireSink',{
-          connectionString: 'ws://'+response.ipaddress+':'+response.port,
-          session: response.session,
-          onSink: this.onTargetSink.bind(this, taskobj)
-        });
-      } catch (e) {
-        console.error(responseobj,'=>',e.stack);
-        console.error(e);
-        this.cb(null);
-      }
+      taskobj.task = taskRegistry.run('acquireSink',{
+        connectionString: 'ws://'+response.ipaddress+':'+response.port,
+        session: response.session,
+        onSink: this.onTargetSink.bind(this, taskobj)
+      });
     }
   };
   UserServiceSinkObtainerTask.prototype.onTargetSink = function (taskobj, sink) {

@@ -17,23 +17,7 @@ function createGetInTask (execlib, UserServiceSinkObtainerTask) {
     UserServiceSinkObtainerTask.prototype.destroy.call(this);
   };
   GetInTask.prototype.obtainEntryPointSink = function () {
-    if(!this.sinkname){
-      this.cb(null);
-      this.destroy();
-      return;
-    }
-    taskRegistry.run('findAndRun', {
-      program: {
-        sinkname: this.sinkname,
-        identity: {name: 'user', role: 'user'},
-        task: {
-          name: this.onEntryPointSink.bind(this),
-          propertyhash: {
-            'ipaddress': 'fill yourself'
-          }
-        }
-      }
-    });
+    this.goForLetMeIn(this.ep_ipaddress, this.ep_port);
   };
   GetInTask.prototype.compulsoryConstructionProperties = ['ipaddress', 'port', 'cb'];
 
