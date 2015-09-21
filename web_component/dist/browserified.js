@@ -803,7 +803,7 @@ function createUserRepresentation(execlib) {
     activationobj = new SinkActivationMonitor(defer);
     if (sink.remoteSinkNames) {
       //console.log('remote sink names', sink.remoteSinkNames);
-      //sink.remoteSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, false, activationobj, subsinkinfoextras));
+      sink.remoteSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, false, activationobj, subsinkinfoextras));
     }
     if (sink.localSinkNames) {
       sink.localSinkNames.forEach(this.subSinkInfo2SubInit.bind(this, true, activationobj, subsinkinfoextras));
