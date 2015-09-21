@@ -10,18 +10,15 @@ function createUserServiceSinkObtainer (execlib) {
     Task.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.identity = prophash.identity;
-    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
+    this.propertyhash = prophash.propertyhash;
     this.cb = prophash.cb;
-    this.sinkinfoextras = prophash.sinkinfoextras;
     this.ipaddress = null;
   }
   lib.inherit(UserServiceSinkObtainerTask, Task);
   UserServiceSinkObtainerTask.prototype.destroy = function () {
     this.ipaddress = null;
-    this.sinkinfoextras = null;
     this.cb = null;
-    this.representation.destroy();
-    this.representation = null;
+    this.propertyhash = null;
     this.identity = null;
     this.sinkname = null;
     Task.prototype.destroy.call(this);
@@ -76,7 +73,8 @@ function createUserServiceSinkObtainer (execlib) {
     taskobj = null;
     taskRegistry.run('acquireUserServiceSink', {
       sink: sink,
-      cb: this.onUserServiceSink.bind(this)
+      cb: this.onUserServiceSink.bind(this),
+      propertyhash: this.propertyhash || {}
     });
   };
   UserServiceSinkObtainerTask.prototype.onUserServiceSink = function (sink) {
