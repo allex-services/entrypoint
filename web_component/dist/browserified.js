@@ -791,15 +791,15 @@ function createUserRepresentation(execlib) {
     return ret;
   };
   SinkRepresentation.prototype.handleSinkInfo = function (defer, sink, subsinkinfoextras) {
+    if (!sink) {
+      defer.resolve(0);
+      return;
+    }
     var sinkstate = taskRegistry.run('materializeState',{
         sink: sink,
         data: this.state
         }),
         activationobj;
-    if (!sink) {
-      defer.resolve(0);
-      return;
-    }
     activationobj = new SinkActivationMonitor(defer);
     if (sink.remoteSinkNames) {
       //console.log('remote sink names', sink.remoteSinkNames);
