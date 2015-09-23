@@ -51,7 +51,10 @@ function createUserServiceSinkObtainer (execlib) {
   UserServiceSinkObtainerTask.prototype.onLetMeIn = function (responseobj) {
     if (!(responseobj && responseobj.data)) {
       console.log('bad login', this.identity);
-      this.cb(null);
+      this.cb({
+        task: this,
+        taskRegistry: taskRegistry
+      });
       this.destroy();
     } else {
       var response, taskobj = {task:null};
