@@ -227,7 +227,11 @@ function createEntryPointService(execlib, ParentServicePack) {
         this.sessionsWriterSink.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
       } else {
         if (this.destroyed) {
-          lib.runNext(this.letMeOut.bind(this, url, req, res), 100);
+          if (this.sessionsSinkName) {
+            lib.runNext(this.letMeOut.bind(this, url, req, res), 100);
+          } else {
+            res.end('ok');
+          }
         } else {
           res.end();
         }
