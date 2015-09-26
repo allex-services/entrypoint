@@ -50,9 +50,9 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     this.strategynames = Object.keys(prophash.strategies);
     this.sessionsSinkName = prophash.sessionsDB;
-    this.sessionsWriterSink = null;
+    this.sessionsDBSinkFinder = null;
     if (this.sessionsSinkName) {
-      taskRegistry.run('findSink', {
+      this.sessionsDBSinkFinder = taskRegistry.run('findSink', {
         sinkname: this.sessionsSinkName,
         identity: {
           name: 'user',
@@ -65,10 +65,15 @@ function createEntryPointService(execlib, ParentServicePack) {
   }
   ParentService.inherit(EntryPointService,factoryCreator);
   EntryPointService.prototype.__cleanUp = function () {
-    if (this.sessionsWriterSink) {
-      this.sessionsWriterSink.destroy();
+    if (this.sessionsDBSinkFinder) {
+      this.sessionsDBSinkFinder.destroy();
     }
-    this.sessionsWriterSink = null;
+    this.sessionsDBSinkFinder = null;
+    var sw = this.state.get('sessionsWriter');
+    if (sw) {
+      this.state.remove('sessionsWriter');
+      sw.destroy();
+    }
     this.sessionsSinkName = null;
     this.strategynames = null;
     if(!this.targets){
@@ -154,22 +159,25 @@ function createEntryPointService(execlib, ParentServicePack) {
     if (!this.sessionsSinkName) {
       defer.reject(new lib.Error('NO_SESSIONS_SUPPORT'));
     } else {
-      taskRegistry.run('findSink', {
-        sinkname: this.sessionsSinkName,
-        identity: {
-          name: 'user',
-          role: 'user',
-          filter: {
-            op: 'eq',
-            field: 'session',
-            value: session 
-          }
-        },
-        onSink: this.onSessionCheckerSink.bind(this, session, defer)
-      });
+      this.getSession(session).done(
+        this.onSessionRead.bind(this, session, defer),
+        defer.reject.bind(defer)
+      );
     }
     return defer.promise;
   };
+  EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
+    taskRegistry.run('readFromDataSink',{
+      sink:sessionsWriter,
+      filter: {
+        op: 'eq',
+        field: 'session',
+        value: session
+      },
+      singleshot: true,
+      cb: defer.resolve.bind(defer)
+    });
+  });
   EntryPointService.prototype.processResolvedUser = function (userhash) {
     if(!userhash){
       return {userhash:null,session:null};
@@ -179,10 +187,11 @@ function createEntryPointService(execlib, ParentServicePack) {
   EntryPointService.prototype.produceSession = function(userhash){
     var session = lib.uid(),
       identityobj = {userhash:userhash,session:session},
+      sw = this.state.get('sessionsWriter'),
       d;
-    if (this.sessionsWriterSink) {
+    if (sw) {
       d = q.defer() ;
-      this.sessionsWriterSink.call('create', {session:session, username: userhash.name}).done(
+      sw.call('create', {session:session, username: userhash.name}).done(
         d.resolve.bind(d,identityobj),
         d.reject.bind(d)
       );
@@ -221,10 +230,11 @@ function createEntryPointService(execlib, ParentServicePack) {
     );
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
+    var sw;
     if(url && url.query && url.query.session){
-      if (this.sessionsWriterSink) {
-        //console.log('calling sessionsWriterSink to delete', url.query.session);
-        this.sessionsWriterSink.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
+      sw = this.state.get('sessionsWriter');
+      if (sw) {
+        sw.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
       } else {
         if (this.destroyed) {
           if (this.sessionsSinkName) {
@@ -314,21 +324,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
     return defer.promise;
   };
-  EntryPointService.prototype.onSessionCheckerSink = function (session, defer, sessionsink) {
-    var data = [];
-    taskRegistry.run('materializeData', {
-      sink: sessionsink,
-      data: data,
-      onInitiated: this.onSessionRead.bind(this, session, defer, sessionsink, data)
-    });
-  };
-  EntryPointService.prototype.onSessionRead = function (session, defer, sessionsink, data) {
-    sessionsink.destroy();
-    if (data.length>1) {
-      //internal error, should never get more than 1 result
-      defer.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
-    }
-    var record = data[0];
+  EntryPointService.prototype.onSessionRead = function (session, defer, record) {
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
       this.remoteDBSink.call('fetchUser', {
@@ -342,7 +338,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     defer.resolve({userhash:userhash,session:session});
   };
   EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
-    this.sessionsWriterSink = sessionswritersink;
+    this.state.set('sessionsWriter', sessionswritersink);
   };
 
   //target handling fun
