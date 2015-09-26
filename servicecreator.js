@@ -323,6 +323,11 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.onSessionRead = function (session, defer, sessionsink, data) {
+    sessionsink.destroy();
+    if (data.length>1) {
+      //internal error, should never get more than 1 result
+      defer.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
+    }
     var record = data[0];
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
