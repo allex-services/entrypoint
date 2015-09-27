@@ -43,8 +43,12 @@ function createUserServiceSinkObtainer (execlib) {
     this.goForLetMeIn(sinkinfo.ipaddress, port);
   };
   UserServiceSinkObtainerTask.prototype.goForLetMeIn = function (address, port) {
+    if (!this.log) {
+      return;
+    }
     lib.request('http://'+address+':'+port+'/letMeIn',{
       onComplete: this.onLetMeIn.bind(this),
+      onError: this.goForLetMeIn.bind(this, address, port),
       parameters: this.identity
     });
   };

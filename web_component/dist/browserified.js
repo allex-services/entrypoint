@@ -230,15 +230,22 @@ function createUserServiceSinkObtainer (execlib) {
     this.goForLetMeIn(sinkinfo.ipaddress, port);
   };
   UserServiceSinkObtainerTask.prototype.goForLetMeIn = function (address, port) {
+    if (!this.log) {
+      return;
+    }
     lib.request('http://'+address+':'+port+'/letMeIn',{
       onComplete: this.onLetMeIn.bind(this),
+      onError: this.goForLetMeIn.bind(this, address, port),
       parameters: this.identity
     });
   };
   UserServiceSinkObtainerTask.prototype.onLetMeIn = function (responseobj) {
     if (!(responseobj && responseobj.data)) {
       console.log('bad login', this.identity);
-      this.cb(null);
+      this.cb({
+        task: this,
+        taskRegistry: taskRegistry
+      });
       this.destroy();
     } else {
       var response, taskobj = {task:null};
