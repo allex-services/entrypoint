@@ -1,6 +1,7 @@
 function createGetInWithRepresentationTask (execlib, GetInTask) {
   'use strict';
-  var lib = execlib.lib;
+  var lib = execlib.lib,
+    execSuite = execlib.execSuite;
 
   function GetInWithRepresentationTask (prophash) {
     GetInTask.call(this, prophash);
