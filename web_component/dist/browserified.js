@@ -112,7 +112,8 @@ module.exports = createGetInTask;
 },{}],9:[function(require,module,exports){
 function createGetInWithRepresentationTask (execlib, GetInTask) {
   'use strict';
-  var lib = execlib.lib;
+  var lib = execlib.lib,
+    execSuite = execlib.execSuite;
 
   function GetInWithRepresentationTask (prophash) {
     GetInTask.call(this, prophash);
@@ -342,7 +343,8 @@ function createUserRepresentation(execlib) {
         state: sinkstate,
         subinits: this.subinits
       });
-    } else {
+    }
+    if (this.sinksToWait.count < 1) {
       this.resolve(0);
     }
   };
@@ -675,6 +677,7 @@ function createUserRepresentation(execlib) {
     this.stateEvents = null;
     this.subsinks = null;
     this.data = null;
+    console.log('destroying state');
     this.state.destroy();
     this.state = null;
     this.sink = null;
@@ -763,7 +766,6 @@ function createUserRepresentation(execlib) {
   }
 
   SinkRepresentation.prototype.setSink = function (sink, sinkinfoextras) {
-    try {
     var d = q.defer(),
       subsinkinfoextras = [];
     if (this.sink) {
@@ -786,10 +788,6 @@ function createUserRepresentation(execlib) {
       }
     }
     return d.promise;
-    } catch (e) {
-      console.error(e.stack);
-      console.error(e);
-    }
   };
   SinkRepresentation.prototype.produceDataMaterializationPropertyHash = function (sink) {
     var ret = this.dataEvents.listenerPack();

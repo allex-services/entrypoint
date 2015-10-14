@@ -202,7 +202,9 @@ function createEntryPointService(execlib, ParentServicePack) {
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
     if(url && url.query && url.query.session){
-      this.checkSession(url.query.session).done(
+      this.checkSession(url.query.session)
+      .then(null,console.log.bind(console, 'checkSession failed'))
+      .done(
         this.doLetHimIn.bind(this, res),
         res.end.bind(res,'')
       );
@@ -224,7 +226,9 @@ function createEntryPointService(execlib, ParentServicePack) {
       return;
     }
     //now, introduceSession to a __chosen__ target. __chosen__
-    this.chooseTarget().done(
+    this.chooseTarget()
+    .then(null, console.log.bind(console, 'chooseTarget failed'))
+    .done(
       this.onTargetChosen.bind(this,res,identityobj),
       res.end.bind(res,'')
     );
@@ -349,6 +353,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
   };
   EntryPointService.prototype.huntSingleTarget = function(sinkname){
+    console.log('SHOULD HUNT FOR SINGLE TARGET', sinkname);
     taskRegistry.run('findAndRun',{
       program: {
         sinkname:sinkname,
@@ -400,13 +405,18 @@ function createEntryPointService(execlib, ParentServicePack) {
   };
   EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
     if(!targetobj.target){
+      console.log('onTargetChosen, but no target?', JSON.stringify(targetobj, null, 2));
       res.end();
       return;
     }
     var ipaddress = targetobj.target.publicaddress || targetobj.target.address,
       port = targetobj.target.publicport || targetobj.target.port,
       session = identityobj.session;
-    targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash).done(
+
+
+    targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
+    .then(null, console.log.bind(console, 'introduceSession failed'))
+    .done(
       res.end.bind(res,JSON.stringify({
         ipaddress:ipaddress,
         port:port,
