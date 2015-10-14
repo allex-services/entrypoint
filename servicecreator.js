@@ -180,7 +180,7 @@ function createEntryPointService(execlib, ParentServicePack) {
   });
   EntryPointService.prototype.processResolvedUser = function (userhash) {
     if(!userhash){
-      return {userhash:null,session:null};
+      return q({userhash:null,session:null});
     }
     return this.produceSession(userhash);
   };
@@ -197,7 +197,7 @@ function createEntryPointService(execlib, ParentServicePack) {
       );
       return d.promise;
     } else {
-      return identityobj;
+      return q(identityobj);
     }
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
