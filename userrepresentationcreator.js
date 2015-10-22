@@ -114,6 +114,9 @@ function createUserRepresentation(execlib) {
     if (!this.sec) {
       return;
     }
+    if (!this.sec.consumers) {
+      return;
+    }
     this.sec.consumers.remove(this.path);
     lib.containerDestroyAll(this.activatorhandlers);
     this.activatorhandlers.destroy();
