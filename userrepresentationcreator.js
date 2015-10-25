@@ -359,7 +359,18 @@ function createUserRepresentation(execlib) {
     this.onDeleteListener = null;
   };
 
-  function SinkRepresentation(eventhandlers){
+  /*
+  identities are hints for futher subconnects, in form of
+  blaservice: {
+    identity: {name: 'name1', role: 'role1'},
+    sub: {
+      traservice: {
+        identity: {name: 'name15', role: 'role22'}
+      }
+    }
+  }
+  */
+  function SinkRepresentation(eventhandlers, identities){
     this.sink = null;
     this.state = new lib.ListenableMap();
     this.data = [];
@@ -367,10 +378,12 @@ function createUserRepresentation(execlib) {
     this.stateEvents = new StateEventConsumerPack();
     this.dataEvents = new DataEventConsumerPack();
     this.eventHandlers = eventhandlers;
+    this.identities = identities;
     this.connectEventHandlers(eventhandlers);
   }
   SinkRepresentation.prototype.destroy = function () {
     //TODO: all the destroys need to be called here
+    this.identities = null;
     this.eventHandlers = null;
     if (this.dataEvents) {
       this.dataEvents.destroy();
@@ -535,12 +548,12 @@ function createUserRepresentation(execlib) {
     //console.log(subsinkinfoextras, '+', ssname, '=>', subsubsinkinfoextras);
     if (!subsink) {
       //console.log('new subsink SinkRepresentation',ssname);
-      subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname));
+      subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname), this.subSinkIdentities(ssname));
       this.subsinks[ssname] = subsink;
     }
     activationobj.setup({
         name: ssname,
-        identity: {name: 'user', role: 'user'},
+        identity: this.subIdentity(ssname),
         cb: this.subSinkActivated.bind(this, activationobj, ssname, subsink, subsubsinkinfoextras)
       },sswaitable ? ssname : null);
     /*
@@ -569,9 +582,28 @@ function createUserRepresentation(execlib) {
     }
     return this.eventHandlers.sub[subsinkname];
   };
+  var _defaultIdentity = {name: 'user', role: 'user'};
+  SinkRepresentation.prototype.subIdentity = function (subsinkname) {
+    if (!this.identities) {
+      return _defaultIdentity;
+    }
+    if (!this.identities[subsinkname]) {
+      return _defaultIdentity;
+    }
+    return this.identities[subsinkname].identity || _defaultIdentity;
+  };
+  SinkRepresentation.prototype.subSinkIdentities = function (subsinkname) {
+    if (!this.identities) {
+      return;
+    }
+    if (!this.identities[subsinkname]) {
+      return;
+    }
+    return this.identities[subsinkname].sub;
+  };
 
-  function UserSinkRepresentation(eventhandlers){
-    SinkRepresentation.call(this, eventhandlers);
+  function UserSinkRepresentation(eventhandlers, identities){
+    SinkRepresentation.call(this, eventhandlers, identities);
   }
   lib.inherit(UserSinkRepresentation, SinkRepresentation);
 

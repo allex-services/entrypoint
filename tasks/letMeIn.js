@@ -8,7 +8,8 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
   function LetMeInTask (prophash) {
     UserServiceSinkObtainerTask.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
-    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
+    console.log('identities for LetMeIn', prophash.identities);
+    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers, prophash.identities);
     this.sinkinfoextras = prophash.sinkinfoextras;
   }
   lib.inherit(LetMeInTask, UserServiceSinkObtainerTask);
