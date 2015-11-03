@@ -221,7 +221,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
   };
   EntryPointService.prototype.doLetHimIn = function (res, identityobj) {
-    if(!identityobj.session){
+    if(!(identityobj && identityobj.session)){
       res.end();
       return;
     }
