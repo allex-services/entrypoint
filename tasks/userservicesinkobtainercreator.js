@@ -67,11 +67,11 @@ function createUserServiceSinkObtainer (execlib) {
       taskobj.task = taskRegistry.run('acquireSink',{
         connectionString: 'ws://'+response.ipaddress+':'+response.port,
         session: response.session,
-        onSink: this.onTargetSink.bind(this, taskobj)
+        onSink: this.onTargetSink.bind(this, taskobj, response.session)
       });
     }
   };
-  UserServiceSinkObtainerTask.prototype.onTargetSink = function (taskobj, sink) {
+  UserServiceSinkObtainerTask.prototype.onTargetSink = function (taskobj, session, sink) {
     if(!sink) {
       return;
     }
@@ -80,22 +80,23 @@ function createUserServiceSinkObtainer (execlib) {
     taskobj = null;
     taskRegistry.run('acquireUserServiceSink', {
       sink: sink,
-      cb: this.onUserServiceSink.bind(this),
+      cb: this.onUserServiceSink.bind(this, session),
       propertyhash: this.propertyhash || {}
     });
   };
-  UserServiceSinkObtainerTask.prototype.onUserServiceSink = function (sink) {
+  UserServiceSinkObtainerTask.prototype.onUserServiceSink = function (session, sink) {
     if (this.representation) {
       this.representation.setSink(sink, this.sinkinfoextras).done(
-        this.finalize.bind(this, sink)
+        this.finalize.bind(this, session, sink)
       );
     } else {
-      this.finalize(sink);
+      this.finalize(session, sink);
     }
   };
-  UserServiceSinkObtainerTask.prototype.finalize = function (sink) {
+  UserServiceSinkObtainerTask.prototype.finalize = function (session, sink) {
     this.cb({
       task: this,
+      session: session,
       sink: sink,
       taskRegistry: taskRegistry
     });
