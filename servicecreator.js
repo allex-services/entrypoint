@@ -342,7 +342,13 @@ function createEntryPointService(execlib, ParentServicePack) {
     defer.resolve({userhash:userhash,session:session});
   };
   EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
-    this.state.set('sessionsWriter', sessionswritersink);
+    if (sessionswritersink) {
+      console.trace();
+      console.log('sessionsWriter sink', sessionswritersink.modulename, sessionswritersink.role);
+      this.state.set('sessionsWriter', sessionswritersink);
+    } else {
+      this.state.remove('sessionsWriter');
+    }
   };
 
   //target handling fun
