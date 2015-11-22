@@ -167,6 +167,13 @@ function createEntryPointService(execlib, ParentServicePack) {
     return defer.promise;
   };
   EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
+    console.log('getSession from', sessionsWriter.role);
+    sessionsWriter.call('findSession', session).then(
+      defer.resolve.bind(defer),
+      this.getSessionFromRealSessionWriter.bind(this, session, defer)
+    );
+  });
+  EntryPointService.prototype.getSessionFromRealSessionWriter = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
     taskRegistry.run('readFromDataSink',{
       sink:sessionsWriter,
       filter: {
