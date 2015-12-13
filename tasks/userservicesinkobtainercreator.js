@@ -94,12 +94,14 @@ function createUserServiceSinkObtainer (execlib) {
     }
   };
   UserServiceSinkObtainerTask.prototype.finalize = function (session, sink) {
-    this.cb({
-      task: this,
-      session: session,
-      sink: sink,
-      taskRegistry: taskRegistry
-    });
+    if (this.cb) {
+      this.cb({
+        task: this,
+        session: session,
+        sink: sink,
+        taskRegistry: taskRegistry
+      });
+    }
   };
   UserServiceSinkObtainerTask.prototype.compulsoryConstructionProperties = ['cb'];
 
