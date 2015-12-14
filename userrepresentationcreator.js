@@ -200,7 +200,8 @@ function createUserRepresentation(execlib) {
     });
   };
 
-  function delSerializer(path, delitems, item, itemname) {
+  function delSerializer(path, state, delitems, item, itemname) {
+    state.data.add(itemname, item);
     delitems.push({
       p: path.concat(itemname),
       o: 'sr',
@@ -208,11 +209,11 @@ function createUserRepresentation(execlib) {
     });
   }
   function DataPurger(state) {
-    this.state = new execSuite.StateSource();
+    this.state = new execSuite.Collection();//new execSuite.StateSource();
     this._state = state;
     var path = []; 
     this.delitems = [];
-    this._state.traverse(delSerializer.bind(null, path, this.delitems));
+    this._state.traverse(delSerializer.bind(null, path, this.state, this.delitems));
     if (this.delitems.length !== this._state.count) {
       throw new lib.Error('DELITEMS_CORRUPT', this.delitems.length+' !== '+this._state.count);
     }
@@ -492,6 +493,7 @@ function createUserRepresentation(execlib) {
     if (!sink) {
       console.log('no sink in setSink');
       this.sink = 0; //intentionally
+      d.resolve(0);
     } else {
       this.sink = sink;
       //console.log('at the beginning', sink.localSinkNames, '+', sinkinfoextras);
