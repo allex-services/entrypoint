@@ -324,6 +324,18 @@ function createUserServiceSinkObtainer (execlib) {
       });
     }
   };
+  UserServiceSinkObtainerTask.prototype.goForLetMeOut = function (address, port) {
+    if (!this.log) {
+      return;
+    }
+    lib.request('http://'+address+':'+port+'/letMeOut',{
+      onComplete: this.onLetMeOut.bind(this),
+      onError: this.goForLetMeOut.bind(this, address, port),
+      parameters: this.identity
+    });
+  };
+  UserServiceSinkObtainerTask.prototype.onLetMeOut = function () {
+  };
   UserServiceSinkObtainerTask.prototype.compulsoryConstructionProperties = ['cb'];
 
   return UserServiceSinkObtainerTask;

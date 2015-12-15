@@ -232,6 +232,7 @@ function createEntryPointService(execlib, ParentServicePack) {
       res.end();
       return;
     }
+
     //now, introduceSession to a __chosen__ target. __chosen__
     this.chooseTarget()
     .then(null, console.log.bind(console, 'chooseTarget failed'))
@@ -241,24 +242,67 @@ function createEntryPointService(execlib, ParentServicePack) {
     );
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
-    var sw;
     if(url && url.query && url.query.session){
-      sw = this.state.get('sessionsWriter');
-      if (sw) {
-        sw.call('delete',{op:'eq',field:'session',value:url.query.session}).done(res.end.bind(res,'ok'));
-      } else {
-        if (this.destroyed) {
-          if (this.sessionsSinkName) {
-            lib.runNext(this.letMeOut.bind(this, url, req, res), 100);
-          } else {
-            res.end('ok');
-          }
-        } else {
-          res.end();
-        }
-      }
+      this.checkSession(url.query.session)
+      .then(
+        this.deleteSession.bind(this, url.query.session)
+      )
+      .then(
+        this.onSessionDeleted.bind(this, res)
+      )
+      .fail(
+        res.end.bind(res, '')
+      );
     } else {
+      res.end('');
+    }
+  };
+  EntryPointService.prototype.deleteSession = function (session, userhash, defer) {
+    defer = defer || q.defer();
+    var sw = this.state.get('sessionsWriter');
+    if (sw) {
+      sw.call('delete',{op:'eq',field:'session',value:session})
+      .then(
+        defer.resolve.bind(defer, userhash),
+        defer.reject.bind(defer),
+        defer.notify.bind(defer)
+      );
+    } else {
+      if (this.destroyed) {
+        if (this.sessionsSinkName) {
+          lib.runNext(this.deleteSession.bind(this, session, userhash, defer), 100);
+        } else {
+          defer.reject(new lib.Error('NO_SESSION_SUPPORT'));
+        }
+      } else {
+        defer.reject(new lib.Error('SERVICE_ALREADY_DESTROYED'));
+      }
+    }
+    return defer.promise;
+  };
+  EntryPointService.prototype.onSessionDeleted = function (res, userhash) {
+    //res.end.bind(res,'ok');
+    return this.chooseTarget()
+    .then(
+      this.onTargetChosenForLogout.bind(this, res, userhash)
+    );
+  };
+  EntryPointService.prototype.onTargetChosenForLogout = function (res, userhash, targetobj) {
+    try {
+    if(!targetobj.target){
+      console.log('onTargetChosen, but no target?', JSON.stringify(targetobj, null, 2));
       res.end();
+      return;
+    }
+    console.log('should logout', userhash);
+    targetobj.target.sink.call('logout', userhash.userhash.profile.username)
+    .done(
+      res.end.bind(res,'ok'),
+      res.end.bind(res, '')
+    );
+    } catch(e) {
+      console.error(e.stack);
+      console.error(e);
     }
   };
   EntryPointService.prototype.register = function (url, req, res) {
@@ -424,7 +468,6 @@ function createEntryPointService(execlib, ParentServicePack) {
       port = targetobj.target.publicport || targetobj.target.port,
       session = identityobj.session;
 
-
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
     .then(null, console.log.bind(console, 'introduceSession failed'))
     .done(
@@ -433,7 +476,7 @@ function createEntryPointService(execlib, ParentServicePack) {
         port:port,
         session:session
       })),
-      res.end.bind(res)
+      res.end.bind(res, '')
     );
   };
   EntryPointService.prototype.anonymousMethods = ['register', 'letMeInOnce'];

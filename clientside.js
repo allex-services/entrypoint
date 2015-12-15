@@ -3,6 +3,7 @@ function createClientSide(execlib,ParentServicePack) {
   execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
   var UserServiceSinkObtainerTask = require('./tasks/userservicesinkobtainercreator')(execlib),
     GetInTask = require('./tasks/getIn')(execlib, UserServiceSinkObtainerTask),
+    GetOutTask = require('./tasks/getOut')(execlib, UserServiceSinkObtainerTask),
     LetMeInTask = require('./tasks/letMeIn')(execlib, UserServiceSinkObtainerTask);
   return {
     SinkMap: require('./sinkmapcreator')(execlib, ParentServicePack),
@@ -18,6 +19,9 @@ function createClientSide(execlib,ParentServicePack) {
     },{
       name: 'getInWithRepresentation',
       klass: require('./tasks/getInWithRepresentation')(execlib, GetInTask)
+    },{
+      name: 'letMeOut',
+      klass: GetOutTask
     }]
   };
 }
