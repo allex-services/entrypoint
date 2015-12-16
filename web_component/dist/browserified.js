@@ -7,6 +7,7 @@ function createClientSide(execlib,ParentServicePack) {
   execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
   var UserServiceSinkObtainerTask = require('./tasks/userservicesinkobtainercreator')(execlib),
     GetInTask = require('./tasks/getIn')(execlib, UserServiceSinkObtainerTask),
+    GetOutTask = require('./tasks/getOut')(execlib, UserServiceSinkObtainerTask),
     LetMeInTask = require('./tasks/letMeIn')(execlib, UserServiceSinkObtainerTask);
   return {
     SinkMap: require('./sinkmapcreator')(execlib, ParentServicePack),
@@ -22,13 +23,16 @@ function createClientSide(execlib,ParentServicePack) {
     },{
       name: 'getInWithRepresentation',
       klass: require('./tasks/getInWithRepresentation')(execlib, GetInTask)
+    },{
+      name: 'letMeOut',
+      klass: GetOutTask
     }]
   };
 }
 
 module.exports = createClientSide;
 
-},{"./sinkmapcreator":5,"./tasks/findMeIn":8,"./tasks/getIn":9,"./tasks/getInWithRepresentation":10,"./tasks/letMeIn":11,"./tasks/userservicesinkobtainercreator":12,"./userrepresentationcreator":13}],3:[function(require,module,exports){
+},{"./sinkmapcreator":5,"./tasks/findMeIn":8,"./tasks/getIn":9,"./tasks/getInWithRepresentation":10,"./tasks/getOut":11,"./tasks/letMeIn":12,"./tasks/userservicesinkobtainercreator":13,"./userrepresentationcreator":14}],3:[function(require,module,exports){
 module.exports = {
 };
 
@@ -168,6 +172,35 @@ function createGetInWithRepresentationTask (execlib, GetInTask) {
 module.exports = createGetInWithRepresentationTask;
 
 },{}],11:[function(require,module,exports){
+function createGetOutTask (execlib, UserServiceSinkObtainerTask) {
+  'use strict';
+  var lib = execlib.lib,
+    q = lib.q,
+    execSuite = execlib.execSuite,
+    taskRegistry = execSuite.taskRegistry;
+
+  function GetOutTask (prophash) {
+    UserServiceSinkObtainerTask.call(this, prophash);
+    this.ep_ipaddress = prophash.ipaddress;
+    this.ep_port = prophash.port;
+  }
+  lib.inherit(GetOutTask, UserServiceSinkObtainerTask);
+  GetOutTask.prototype.destroy = function () {
+    this.ep_port = null;
+    this.ep_ipaddress = null;
+    UserServiceSinkObtainerTask.prototype.destroy.call(this);
+  };
+  GetOutTask.prototype.obtainEntryPointSink = function () {
+    this.goForLetMeOut(this.ep_ipaddress, this.ep_port);
+  };
+  GetOutTask.prototype.compulsoryConstructionProperties = ['ipaddress', 'port', 'cb'];
+
+  return GetOutTask;
+}
+
+module.exports = createGetOutTask;
+
+},{}],12:[function(require,module,exports){
 function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
   'use strict';
   var lib = execlib.lib,
@@ -218,7 +251,7 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
 
 module.exports = createLetMeInTask;
 
-},{}],12:[function(require,module,exports){
+},{}],13:[function(require,module,exports){
 function createUserServiceSinkObtainer (execlib) {
   'use strict';
   var lib = execlib.lib,
@@ -343,7 +376,7 @@ function createUserServiceSinkObtainer (execlib) {
 
 module.exports = createUserServiceSinkObtainer;
 
-},{}],13:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 function createUserRepresentation(execlib) {
   'use strict';
   var lib = execlib.lib,

@@ -468,6 +468,7 @@ function createEntryPointService(execlib, ParentServicePack) {
       port = targetobj.target.publicport || targetobj.target.port,
       session = identityobj.session;
 
+
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
     .then(null, console.log.bind(console, 'introduceSession failed'))
     .done(
