@@ -4,6 +4,6 @@
   },
   "protoboard": {
     "role":"web_component",
-    "public_dirs": ["dist"]
+    "public_dirs": []
   }
 }
