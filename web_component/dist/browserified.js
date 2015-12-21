@@ -478,16 +478,12 @@ function createUserRepresentation(execlib) {
     lib.Destroyable.call(this);
     this.sec = stateeventconsumers;
     this.path = path;
-    this.ads = this.extendTo(ADS.listenToScalar([this.path], {
-      activator: this._activated.bind(this),
-      deactivator: this._deactivated.bind(this),
-      setter: this._set.bind(this),
-      rawsetter: this._setRaw.bind(this)
-    }));
+    this.ads = null;
     this.activatorhandlers = new lib.SortedList();
     this.deactivatorhandlers = new lib.SortedList();
     this.setterhandlers = new lib.SortedList();
     this.rawsetterhandlers = new lib.SortedList();
+    this.createADS();
   }
   lib.inherit(StateEventConsumers, lib.Destroyable);
   StateEventConsumers.prototype.__cleanUp = function () {
@@ -514,6 +510,18 @@ function createUserRepresentation(execlib) {
     this.path = null;
     this.sec = null;
     lib.Destroyable.prototype.__cleanUp.call(this);
+  };
+  StateEventConsumers.prototype.createADS = function () {
+    if (this.ads) {
+      this.ads.destroyed = null;
+      this.ads.destroy();
+    }
+    this.ads = this.extendTo(ADS.listenToScalar([this.path], {
+      activator: this._activated.bind(this),
+      deactivator: this._deactivated.bind(this),
+      setter: this._set.bind(this),
+      rawsetter: this._setRaw.bind(this)
+    }));
   };
   StateEventConsumers.prototype.add = function (cb) {
     return new StateEventConsumer(this, cb);
@@ -576,6 +584,7 @@ function createUserRepresentation(execlib) {
   StateEventConsumerPack.prototype.attachTo = function (sink) {
     this.sink = sink;
     this.consumers.traverse(function(listeners, path){
+      listeners.createADS();
       sink.state.setSink(listeners.ads);
     });
   };
