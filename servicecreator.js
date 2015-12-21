@@ -7,6 +7,7 @@ function createEntryPointService(execlib, ParentServicePack) {
     execSuite = execlib.execSuite,
     taskRegistry = execSuite.taskRegistry,
     ParentService = ParentServicePack.Service,
+    qlib = lib.qlib,
     TargetContainer = require('./targetcontainercreator')(execlib);
 
   function factoryCreator(parentFactory) {
@@ -170,10 +171,12 @@ function createEntryPointService(execlib, ParentServicePack) {
     console.log('getSession from', sessionsWriter.role);
     sessionsWriter.call('findSession', session).then(
       defer.resolve.bind(defer),
-      this.getSessionFromRealSessionWriter.bind(this, session, defer)
+      qlib.executor(this.getSessionFromRealSessionWriter.bind(this, session, defer))
     );
   });
   EntryPointService.prototype.getSessionFromRealSessionWriter = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
+    console.log('getSessionFromRealSessionWriter', session, defer);
+    try {
     taskRegistry.run('readFromDataSink',{
       sink:sessionsWriter,
       filter: {
@@ -182,8 +185,16 @@ function createEntryPointService(execlib, ParentServicePack) {
         value: session
       },
       singleshot: true,
-      cb: defer.resolve.bind(defer)
+      //cb: defer.resolve.bind(defer)
+      cb: function (result) {
+        console.log('getSessionFromRealSessionWriter', session, defer, result);
+        defer.resolve(result);
+      }
     });
+    } catch(e) {
+      console.error(e.stack);
+      console.error(e);
+    }
   });
   EntryPointService.prototype.processResolvedUser = function (userhash) {
     if(!userhash){
