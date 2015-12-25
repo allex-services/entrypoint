@@ -301,8 +301,8 @@ function createEntryPointService(execlib, ParentServicePack) {
   EntryPointService.prototype.onTargetChosenForLogout = function (res, userhash, targetobj) {
     try {
     if(!targetobj.target){
-      console.log('onTargetChosen, but no target?', JSON.stringify(targetobj, null, 2));
-      res.end();
+      console.log('onTargetChosen, but no target?', targetobj);
+      res.end(JSON.stringify({error:'NO_TARGETS_YET'}));
       return;
     }
     console.log('should logout', userhash);
@@ -471,8 +471,8 @@ function createEntryPointService(execlib, ParentServicePack) {
   };
   EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
     if(!targetobj.target){
-      console.log('onTargetChosen, but no target?', JSON.stringify(targetobj, null, 2));
-      res.end();
+      console.log('onTargetChosen, but no target?', targetobj);
+      res.end(JSON.stringify({error:'NO_TARGETS_YET'}));
       return;
     }
     var ipaddress = targetobj.target.publicaddress || targetobj.target.address,

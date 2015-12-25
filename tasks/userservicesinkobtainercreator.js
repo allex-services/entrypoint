@@ -47,12 +47,12 @@ function createUserServiceSinkObtainer (execlib) {
       return;
     }
     lib.request('http://'+address+':'+port+'/letMeIn',{
-      onComplete: this.onLetMeIn.bind(this),
+      onComplete: this.onLetMeIn.bind(this, address, port),
       onError: this.goForLetMeIn.bind(this, address, port),
       parameters: this.identity
     });
   };
-  UserServiceSinkObtainerTask.prototype.onLetMeIn = function (responseobj) {
+  UserServiceSinkObtainerTask.prototype.onLetMeIn = function (address, port, responseobj) {
     if (!(responseobj && responseobj.data)) {
       console.log('bad login', this.identity);
       this.cb({
@@ -64,6 +64,10 @@ function createUserServiceSinkObtainer (execlib) {
       var response, taskobj = {task:null};
         response = JSON.parse(responseobj.data);
         this.ipaddress = response.ipaddress;
+      if (response.error && response.error === 'NO_TARGETS_YET') {
+        lib.runNext(this.goForLetMeIn.bind(this, address, port), lib.intervals.Second);
+        return;
+      }
       console.log('will acquireSink on Users', response.ipaddress, ':', response.port);
       taskobj.task = taskRegistry.run('acquireSink',{
         connectionString: 'ws://'+response.ipaddress+':'+response.port,
