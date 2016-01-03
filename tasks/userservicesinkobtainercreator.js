@@ -72,6 +72,7 @@ function createUserServiceSinkObtainer (execlib) {
       taskobj.task = taskRegistry.run('acquireSink',{
         connectionString: 'ws://'+response.ipaddress+':'+response.port,
         session: response.session,
+        singleshot: true,
         onSink: this.onTargetSink.bind(this, taskobj, response.session)
       });
     }
