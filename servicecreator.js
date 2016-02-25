@@ -443,18 +443,33 @@ function createEntryPointService(execlib, ParentServicePack) {
       singleshot: true
     });
   };
+  EntryPointService.prototype.onTargetContainerDown = function (sinkname) {
+    if (!this.targets) {
+      return;
+    }
+    this.targets.remove(sinkname);
+    this.huntSingleTarget(sinkname);
+  };
   EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
     //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.wsport,'=>',eaddress,eport);
+    try {
+    var tc;
     sinkinfo.ipaddress = eaddress;
     sinkinfo.wsport = eport;
     if(sinkinfo.sink){
-      this.targets.add(sinkname,new TargetContainer(sinkname,sinkinfo));
+      tc = new TargetContainer(sinkname,sinkinfo);
+      tc.destroyed.attach(this.onTargetContainerDown.bind(this, sinkname));
+      this.targets.add(sinkname,tc);
     }else{
       var tc = this.targets.remove(sinkname);
       if(tc){
         tc.destroy();
       }
       this.huntSingleTarget(sinkname);
+    }
+    } catch(e) {
+      console.error(e.stack);
+      console.error(e);
     }
   };
   function firstTargetChooser(targetobj,target,targetname){
