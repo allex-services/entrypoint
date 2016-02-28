@@ -155,14 +155,12 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     this.remoteDBSink = remotedbsink;
   };
-  EntryPointService.prototype.checkSession = function(session,defer){
-    defer = defer || q.defer();
+  EntryPointService.prototype.checkSession = function(session){
     if (!this.sessionsSinkName) {
-      defer.reject(new lib.Error('NO_SESSIONS_SUPPORT'));
+      return q.reject(new lib.Error('NO_SESSIONS_SUPPORT'));
     } else {
-      this.getSession(session).done(
-        this.onSessionRead.bind(this, session, defer),
-        defer.reject.bind(defer)
+      return this.getSession(session).then(
+        this.onSessionRead.bind(this, session)
       );
     }
     return defer.promise;
@@ -171,9 +169,12 @@ function createEntryPointService(execlib, ParentServicePack) {
     console.log('getSession from', sessionsWriter.role);
     sessionsWriter.call('findSession', session).then(
       defer.resolve.bind(defer),
-      qlib.executor(this.getSessionFromRealSessionWriter.bind(this, session, defer))
+      this.onSessionNotFound.bind(this, session, defer)
     );
   });
+  EntryPointService.prototype.onSessionNotFound = function (session, defer) {
+    return qlib.promise2defer(this.getSessionFromRealSessionWriter(session), defer);
+  };
   EntryPointService.prototype.getSessionFromRealSessionWriter = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
     console.log('getSessionFromRealSessionWriter', session, defer);
     try {
@@ -265,6 +266,7 @@ function createEntryPointService(execlib, ParentServicePack) {
         res.end.bind(res, '')
       );
     } else {
+      console.log('no session', url.query.session);
       res.end('');
     }
   };
@@ -390,20 +392,21 @@ function createEntryPointService(execlib, ParentServicePack) {
     });
     return defer.promise;
   };
-  EntryPointService.prototype.onSessionRead = function (session, defer, record) {
+  EntryPointService.prototype.onSessionRead = function (session, record) {
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
-      this.remoteDBSink.call('fetchUser', {
+      return this.remoteDBSink.call('fetchUser', {
         username: record.username
-      }).done(this.onUserFetched.bind(this, session, defer));
+      }).then(this.onUserFetched.bind(this, session));
     } else {
-      defer.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
+      return q.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
     }
   };
-  EntryPointService.prototype.onUserFetched = function (session, defer, userhash) {
-    defer.resolve({userhash:userhash,session:session});
+  EntryPointService.prototype.onUserFetched = function (session, userhash) {
+    return q({userhash:userhash,session:session});
   };
   EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
+    console.log('onSessionsWriterSink', sessionswritersink ? 'got it' : 'lost it');
     if (sessionswritersink) {
       this.state.set('sessionsWriter', sessionswritersink);
     } else {

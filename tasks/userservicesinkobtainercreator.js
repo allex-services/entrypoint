@@ -113,13 +113,26 @@ function createUserServiceSinkObtainer (execlib) {
     if (!this.log) {
       return;
     }
+    console.log('requesting letMeOut on', address, port);
     lib.request('http://'+address+':'+port+'/letMeOut',{
+      /*
       onComplete: this.onLetMeOut.bind(this),
       onError: this.goForLetMeOut.bind(this, address, port),
+      */
+      onComplete: this.onLetMeOut.bind(this, address, port),
+      onError: this.onLetMeOutError.bind(this, address, port),
       parameters: this.identity
     });
   };
-  UserServiceSinkObtainerTask.prototype.onLetMeOut = function () {
+  UserServiceSinkObtainerTask.prototype.onLetMeOut = function (address, port) {
+    console.log('letMeOut succeeded on', address, port);
+    this.destroy();
+  };
+  UserServiceSinkObtainerTask.prototype.onLetMeOutError = function (address, port, error) {
+    console.log('letMeOut failed on', address, port, error);
+    //TODO; check for non-existing user for logout.
+    //it makes no sense to retry
+    lib.runNext(this.goForLetMeOut.bind(this, address, port), lib.intervals.Second);
   };
   UserServiceSinkObtainerTask.prototype.compulsoryConstructionProperties = ['cb'];
 
