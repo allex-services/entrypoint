@@ -406,7 +406,6 @@ function createEntryPointService(execlib, ParentServicePack) {
     return q({userhash:userhash,session:session});
   };
   EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
-    console.log('onSessionsWriterSink', sessionswritersink ? 'got it' : 'lost it');
     if (sessionswritersink) {
       this.state.set('sessionsWriter', sessionswritersink);
     } else {
