@@ -534,7 +534,7 @@ function createUserRepresentation(execlib) {
     activationobj.run(sinkstate);
   };
   SinkRepresentation.prototype.subSinkInfo2SubInit = function (sswaitable, activationobj, subsinkinfoextras, ss) {
-    var ssname = ss.name,
+    var ssname = sinkNameName(ss.name),
       subsink,
       subsubsinkinfoextras = [];
     if (!ssname) {
@@ -593,13 +593,19 @@ function createUserRepresentation(execlib) {
     };
     return ret;
   }
+  function sinkNameName (sn) {
+    if (lib.isArray(sn)) {
+      return sn[sn.length-1];
+    } else if (lib.isString(sn)) {
+      return sn;
+    }
+  }
   function namefinder(findobj, si) {
     var srcname;
-    if (lib.isArray(si.name)) {
-      srcname = si.name[si.name.length-1];
-    } else if (lib.isString(si.name)) {
-      srcname = si.name;
+    if (!si) {
+      return;
     }
+    srcname = sinkNameName(si.name);
     if (!srcname) {
       return;
     }

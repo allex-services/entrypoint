@@ -211,8 +211,7 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
   function LetMeInTask (prophash) {
     UserServiceSinkObtainerTask.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
-    console.log('identities for LetMeIn', prophash.identities);
-    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers, prophash.identities);
+    this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
     this.sinkinfoextras = prophash.sinkinfoextras;
   }
   lib.inherit(LetMeInTask, UserServiceSinkObtainerTask);
@@ -301,12 +300,12 @@ function createUserServiceSinkObtainer (execlib) {
       return;
     }
     lib.request('http://'+address+':'+port+'/letMeIn',{
-      onComplete: this.onLetMeIn.bind(this),
+      onComplete: this.onLetMeIn.bind(this, address, port),
       onError: this.goForLetMeIn.bind(this, address, port),
       parameters: this.identity
     });
   };
-  UserServiceSinkObtainerTask.prototype.onLetMeIn = function (responseobj) {
+  UserServiceSinkObtainerTask.prototype.onLetMeIn = function (address, port, responseobj) {
     if (!(responseobj && responseobj.data)) {
       console.log('bad login', this.identity);
       this.cb({
@@ -318,10 +317,15 @@ function createUserServiceSinkObtainer (execlib) {
       var response, taskobj = {task:null};
         response = JSON.parse(responseobj.data);
         this.ipaddress = response.ipaddress;
+      if (response.error && response.error === 'NO_TARGETS_YET') {
+        lib.runNext(this.goForLetMeIn.bind(this, address, port), lib.intervals.Second);
+        return;
+      }
       console.log('will acquireSink on Users', response.ipaddress, ':', response.port);
       taskobj.task = taskRegistry.run('acquireSink',{
         connectionString: 'ws://'+response.ipaddress+':'+response.port,
         session: response.session,
+        singleshot: true,
         onSink: this.onTargetSink.bind(this, taskobj, response.session)
       });
     }
@@ -362,13 +366,26 @@ function createUserServiceSinkObtainer (execlib) {
     if (!this.log) {
       return;
     }
+    console.log('requesting letMeOut on', address, port);
     lib.request('http://'+address+':'+port+'/letMeOut',{
+      /*
       onComplete: this.onLetMeOut.bind(this),
       onError: this.goForLetMeOut.bind(this, address, port),
+      */
+      onComplete: this.onLetMeOut.bind(this, address, port),
+      onError: this.onLetMeOutError.bind(this, address, port),
       parameters: this.identity
     });
   };
-  UserServiceSinkObtainerTask.prototype.onLetMeOut = function () {
+  UserServiceSinkObtainerTask.prototype.onLetMeOut = function (address, port) {
+    console.log('letMeOut succeeded on', address, port);
+    this.destroy();
+  };
+  UserServiceSinkObtainerTask.prototype.onLetMeOutError = function (address, port, error) {
+    console.log('letMeOut failed on', address, port, error);
+    //TODO; check for non-existing user for logout.
+    //it makes no sense to retry
+    lib.runNext(this.goForLetMeOut.bind(this, address, port), lib.intervals.Second);
   };
   UserServiceSinkObtainerTask.prototype.compulsoryConstructionProperties = ['cb'];
 
@@ -749,18 +766,7 @@ function createUserRepresentation(execlib) {
     this.onDeleteListener = null;
   };
 
-  /*
-  identities are hints for futher subconnects, in form of
-  blaservice: {
-    identity: {name: 'name1', role: 'role1'},
-    sub: {
-      traservice: {
-        identity: {name: 'name15', role: 'role22'}
-      }
-    }
-  }
-  */
-  function SinkRepresentation(eventhandlers, identities){
+  function SinkRepresentation(eventhandlers){
     this.sink = null;
     this.state = new lib.ListenableMap();
     this.data = [];
@@ -768,12 +774,10 @@ function createUserRepresentation(execlib) {
     this.stateEvents = new StateEventConsumerPack();
     this.dataEvents = new DataEventConsumerPack();
     this.eventHandlers = eventhandlers;
-    this.identities = identities;
     this.connectEventHandlers(eventhandlers);
   }
   SinkRepresentation.prototype.destroy = function () {
     //TODO: all the destroys need to be called here
-    this.identities = null;
     this.eventHandlers = null;
     if (this.dataEvents) {
       this.dataEvents.destroy();
@@ -926,9 +930,14 @@ function createUserRepresentation(execlib) {
     }
     activationobj.run(sinkstate);
   };
-  SinkRepresentation.prototype.subSinkInfo2SubInit = function (sswaitable, activationobj, subsinkinfoextras, ssname) {
-    var subsink = this.subsinks[ssname], 
+  SinkRepresentation.prototype.subSinkInfo2SubInit = function (sswaitable, activationobj, subsinkinfoextras, ss) {
+    var ssname = sinkNameName(ss.name),
+      subsink,
       subsubsinkinfoextras = [];
+    if (!ssname) {
+      throw new lib.Error('NO_SUBSINK_NAME');
+    }
+    subsink = this.subsinks[ssname]; 
     if (subsinkinfoextras) {
       subsinkinfoextras.forEach(function (esubsinkinfo) {
         if (esubsinkinfo[0] === ssname) {
@@ -938,8 +947,8 @@ function createUserRepresentation(execlib) {
     }
     //console.log(subsinkinfoextras, '+', ssname, '=>', subsubsinkinfoextras);
     if (!subsink) {
-      //console.log('new subsink SinkRepresentation',ssname);
-      subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname), this.subSinkIdentities(ssname));
+      //console.log('new subsink SinkRepresentation',ssname,this.sink.localSinkNames, this.sink.remoteSinkNames);
+      subsink = new SinkRepresentation(this.subSinkEventHandlers(ssname));
       this.subsinks[ssname] = subsink;
     }
     activationobj.setup({
@@ -974,27 +983,54 @@ function createUserRepresentation(execlib) {
     return this.eventHandlers.sub[subsinkname];
   };
   var _defaultIdentity = {name: 'user', role: 'user'};
+  function sinkInfo2Identity(si) {
+    var ret = {
+      role: si.role || 'user',
+      name: si.username || 'user'
+    };
+    return ret;
+  }
+  function sinkNameName (sn) {
+    if (lib.isArray(sn)) {
+      return sn[sn.length-1];
+    } else if (lib.isString(sn)) {
+      return sn;
+    }
+  }
+  function namefinder(findobj, si) {
+    var srcname;
+    if (!si) {
+      return;
+    }
+    srcname = sinkNameName(si.name);
+    if (!srcname) {
+      return;
+    }
+    if (findobj.name === srcname) {
+      findobj.found = si;
+      return true;
+    }
+  }
+  function findSinkInfo(sis, name) {
+    var und, findobj = {name: name, found: und};
+    if(sis.some(namefinder.bind(null, findobj))){
+      return findobj.found;
+    }
+  }
   SinkRepresentation.prototype.subIdentity = function (subsinkname) {
-    if (!this.identities) {
-      return _defaultIdentity;
+    var si = findSinkInfo(this.sink.localSinkNames, subsinkname);
+    if (si) {
+      return sinkInfo2Identity(si);
     }
-    if (!this.identities[subsinkname]) {
-      return _defaultIdentity;
+    si = findSinkInfo(this.sink.remoteSinkNames, subsinkname);
+    if (si) {
+      return sinkInfo2Identity(si);
     }
-    return this.identities[subsinkname].identity || _defaultIdentity;
-  };
-  SinkRepresentation.prototype.subSinkIdentities = function (subsinkname) {
-    if (!this.identities) {
-      return;
-    }
-    if (!this.identities[subsinkname]) {
-      return;
-    }
-    return this.identities[subsinkname].sub;
+    return {name: 'user', role: 'user'};
   };
 
-  function UserSinkRepresentation(eventhandlers, identities){
-    SinkRepresentation.call(this, eventhandlers, identities);
+  function UserSinkRepresentation(eventhandlers){
+    SinkRepresentation.call(this, eventhandlers);
   }
   lib.inherit(UserSinkRepresentation, SinkRepresentation);
 
