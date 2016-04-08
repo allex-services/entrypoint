@@ -897,7 +897,7 @@ function createUserRepresentation(execlib) {
       this.handleSinkInfo(d, sink, subsinkinfoextras);
       this.stateEvents.attachTo(sink);
       if(sink.recordDescriptor){
-        taskRegistry.run('materializeData',this.produceDataMaterializationPropertyHash(sink));
+        taskRegistry.run('materializeQuery',this.produceDataMaterializationPropertyHash(sink));
       }
     }
     return d.promise;
@@ -906,6 +906,7 @@ function createUserRepresentation(execlib) {
     var ret = this.dataEvents.listenerPack();
     ret.sink = sink;
     ret.data = this.data;
+    ret.continuous = true;
     return ret;
   };
   SinkRepresentation.prototype.handleSinkInfo = function (defer, sink, subsinkinfoextras) {
