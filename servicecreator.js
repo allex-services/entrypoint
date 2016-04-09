@@ -57,9 +57,9 @@ function createEntryPointService(execlib, ParentServicePack) {
         sinkname: this.sessionsSinkName,
         identity: {
           name: 'user',
-          role: 'writer',
+          role: 'user',
         },
-        onSink: this.onSessionsWriterSink.bind(this)
+        onSink: this.onSessionsSink.bind(this)
       });
     }
     this.processTarget(prophash.target);
@@ -70,9 +70,9 @@ function createEntryPointService(execlib, ParentServicePack) {
       this.sessionsDBSinkFinder.destroy();
     }
     this.sessionsDBSinkFinder = null;
-    var sw = this.state.get('sessionsWriter');
+    var sw = this.state.get('sessions');
     if (sw) {
-      this.state.remove('sessionsWriter');
+      this.state.remove('sessions');
       sw.destroy();
     }
     this.sessionsSinkName = null;
@@ -165,21 +165,21 @@ function createEntryPointService(execlib, ParentServicePack) {
     }
     return defer.promise;
   };
-  EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
-    console.log('getSession from', sessionsWriter.role);
-    sessionsWriter.call('findSession', session).then(
+  EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessions'], function (sessions, session, defer) {
+    console.log('getSession from', sessions.role);
+    sessions.call('findSession', session).then(
       defer.resolve.bind(defer),
       this.onSessionNotFound.bind(this, session, defer)
     );
   });
   EntryPointService.prototype.onSessionNotFound = function (session, defer) {
-    return qlib.promise2defer(this.getSessionFromRealSessionWriter(session), defer);
+    return qlib.promise2defer(this.getSessionFromRealSession(session), defer);
   };
-  EntryPointService.prototype.getSessionFromRealSessionWriter = execSuite.dependentServiceMethod([], ['sessionsWriter'], function (sessionsWriter, session, defer) {
-    console.log('getSessionFromRealSessionWriter', session, defer);
+  EntryPointService.prototype.getSessionFromRealSession = execSuite.dependentServiceMethod([], ['sessions'], function (sessions, session, defer) {
+    console.log('getSessionFromRealSession', session, defer);
     try {
     taskRegistry.run('readFromDataSink',{
-      sink:sessionsWriter,
+      sink:sessions,
       filter: {
         op: 'eq',
         field: 'session',
@@ -188,7 +188,7 @@ function createEntryPointService(execlib, ParentServicePack) {
       singleshot: true,
       //cb: defer.resolve.bind(defer)
       cb: function (result) {
-        console.log('getSessionFromRealSessionWriter', session, defer, result);
+        console.log('getSessionFromRealSession', session, defer, result);
         defer.resolve(result);
       }
     });
@@ -206,7 +206,7 @@ function createEntryPointService(execlib, ParentServicePack) {
   EntryPointService.prototype.produceSession = function(userhash){
     var session = lib.uid(),
       identityobj = {userhash:userhash,session:session},
-      sw = this.state.get('sessionsWriter'),
+      sw = this.state.get('sessions'),
       d;
     if (sw) {
       d = q.defer() ;
@@ -272,7 +272,7 @@ function createEntryPointService(execlib, ParentServicePack) {
   };
   EntryPointService.prototype.deleteSession = function (session, userhash, defer) {
     defer = defer || q.defer();
-    var sw = this.state.get('sessionsWriter');
+    var sw = this.state.get('sessions');
     if (sw) {
       sw.call('delete',{op:'eq',field:'session',value:session})
       .then(
@@ -405,11 +405,11 @@ function createEntryPointService(execlib, ParentServicePack) {
   EntryPointService.prototype.onUserFetched = function (session, userhash) {
     return q({userhash:userhash,session:session});
   };
-  EntryPointService.prototype.onSessionsWriterSink = function (sessionswritersink) {
-    if (sessionswritersink) {
-      this.state.set('sessionsWriter', sessionswritersink);
+  EntryPointService.prototype.onSessionsSink = function (sessionssink) {
+    if (sessionssink) {
+      this.state.set('sessions', sessionssink);
     } else {
-      this.state.remove('sessionsWriter');
+      this.state.remove('sessions');
     }
   };
 
