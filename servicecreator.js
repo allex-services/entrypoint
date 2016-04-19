@@ -166,11 +166,24 @@ function createEntryPointService(execlib, ParentServicePack) {
     return defer.promise;
   };
   EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessions'], function (sessions, session, defer) {
-    console.log('getSession from', sessions.role);
+    //console.log('getSession from', sessions.role);
+    /*
     sessions.call('findSession', session).then(
       defer.resolve.bind(defer),
       this.onSessionNotFound.bind(this, session, defer)
     );
+    */
+    taskRegistry.run('readFromDataSink', {
+      sink: sessions,
+      filter: {
+        op: 'eq',
+        field: 'session',
+        value: session
+      },
+      singleshot: true,
+      cb: defer.resolve.bind(defer),
+      errorcb: this.onSessionNotFound.bind(this, session, defer)
+    });
   });
   EntryPointService.prototype.onSessionNotFound = function (session, defer) {
     return qlib.promise2defer(this.getSessionFromRealSession(session), defer);
