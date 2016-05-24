@@ -99,6 +99,9 @@ function createEntryPointService(execlib, ParentServicePack) {
     this.port = null;
     ParentService.prototype.__cleanUp.call(this);
   };
+  EntryPointService.prototype.isInitiallyReady = function () {
+    return false;
+  };
   EntryPointService.prototype.acquirePort = function(defer){
     console.log('MY PORT',this.port);
     defer.resolve(this.port);
@@ -147,6 +150,11 @@ function createEntryPointService(execlib, ParentServicePack) {
       return;
     }
     this.authenticator = authsink;
+    if (!this.authenticator) {
+      console.error('no authsink');
+      process.exit(0);
+    }
+    this.readyToAcceptUsersDefer.resolve(true);
   };
   EntryPointService.prototype.onRemoteDBSink = function (remotedbsink) {
     if(!this.destroyed){
