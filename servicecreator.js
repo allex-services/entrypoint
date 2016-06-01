@@ -142,14 +142,18 @@ function createEntryPointService(execlib, ParentServicePack) {
   };
   EntryPointService.prototype.authenticate = function(credentials){
     if(!this.strategynames){
-      var d = q.defer();
-      d.resolve(null);
-      return d.promise;
+      return q(null);
+    }
+    if(!this.authenticator){
+      console.trace();
+      console.error('How come EntryPointService has no authenticator?!');
+      return q(null);
     }
     var resolveobj = {};
     this.strategynames.forEach(function(stratname){
       resolveobj[stratname] = credentials;
     });
+    credentials = null;
     return this.authenticator.call('resolve',resolveobj);
   };
   EntryPointService.prototype.onAuthenticator = function (authsink) {
