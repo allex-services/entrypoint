@@ -1,6 +1,7 @@
-function sinkMapCreator(execlib,ParentServicePack){
+function sinkMapCreator(execlib,ParentSinkMap){
   'use strict';
-  var sinkmap = new (execlib.lib.Map), ParentSinkMap = ParentServicePack.SinkMap;
+  execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
+  var sinkmap = new (execlib.lib.Map);
   sinkmap.add('service',require('./sinks/servicesinkcreator')(execlib,ParentSinkMap.get('service')));
   sinkmap.add('user',require('./sinks/usersinkcreator')(execlib,ParentSinkMap.get('user')));
   

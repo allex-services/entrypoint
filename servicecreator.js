@@ -8,13 +8,12 @@ function resEnder (res, string) {
   }
 }
 
-function createEntryPointService(execlib, ParentServicePack) {
+function createEntryPointService(execlib, ParentService) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
     execSuite = execlib.execSuite,
     taskRegistry = execSuite.taskRegistry,
-    ParentService = ParentServicePack.Service,
     qlib = lib.qlib,
     TargetContainer = require('./targetcontainercreator')(execlib);
 
