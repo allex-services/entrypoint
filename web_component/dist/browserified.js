@@ -554,6 +554,7 @@ function createUserRepresentation(execlib) {
     this.rawsetterhandlers.traverse(function(cb){
       cb.apply(null,args);
     });
+    args = null;
   };
 
   function StateEventConsumersListener(stateeventconsumerpack, listenerhash) {
@@ -604,6 +605,7 @@ function createUserRepresentation(execlib) {
       listeners.createADS();
       sink.state.setSink(listeners.ads);
     });
+    sink = null;
   };
 
   function delSerializer(path, state, delitems, item, itemname) {
@@ -623,6 +625,7 @@ function createUserRepresentation(execlib) {
     if (this.delitems.length !== this._state.count) {
       throw new lib.Error('DELITEMS_CORRUPT', this.delitems.length+' !== '+this._state.count);
     }
+    path = null;
   }
   DataPurger.prototype.destroy = function () {
     this.delitems = null;
@@ -674,6 +677,7 @@ function createUserRepresentation(execlib) {
     this.listeners = this.consumers.map(function(cons){
       return hookcollection.attach(cons);
     });
+    hookcollection = null;
   };
   DataEventConsumers.prototype.detach = function () { //detach is "detach self from hook given in attachTo
     if(!this.listeners){
@@ -695,6 +699,7 @@ function createUserRepresentation(execlib) {
     this.consumers.traverse(function (l) {
       l.apply(null,args);
     });
+    args = null;
   };
   DataEventConsumers.prototype.fire_er = function () {
     return this.fire.bind(this);
@@ -726,7 +731,6 @@ function createUserRepresentation(execlib) {
     this.onRecordDeletion = null;
   };
   DataEventConsumerPack.prototype.listenerPack = function () {
-    var orc = this.onRecordCreation;
     return {
       onInitiated: this.onInitiated.fire_er(),
       onRecordCreation: this.onRecordCreation.fire_er(),
@@ -769,55 +773,49 @@ function createUserRepresentation(execlib) {
   function SinkRepresentation(eventhandlers){
     this.sink = null;
     this.state = new lib.ListenableMap();
-    this.data = [];
     this.subsinks = {};
     this.stateEvents = new StateEventConsumerPack();
-    this.dataEvents = new DataEventConsumerPack();
     this.eventHandlers = eventhandlers;
     this.connectEventHandlers(eventhandlers);
+    this.sinkWaiters = new lib.DeferFifo();
   }
   SinkRepresentation.prototype.destroy = function () {
     //TODO: all the destroys need to be called here
-    this.eventHandlers = null;
-    if (this.dataEvents) {
-      this.dataEvents.destroy();
+    if (this.sinkWaiters) {
+      this.sinkWaiters.destroy();
     }
-    this.dataEvents = null;
+    this.sinkWaiters = null;
+    this.eventHandlers = null;
     if (this.stateEvents) {
       this.stateEvents.destroy();
     }
     this.stateEvents = null;
     this.subsinks = null;
-    this.data = null;
     console.log('destroying state');
     this.state.destroy();
     this.state = null;
     this.sink = null;
   };
+  SinkRepresentation.prototype.waitForSink = function () {
+    if (this.sink) {
+      return q(this.sink);
+    }
+    return this.sinkWaiters.defer();
+  };
+  function subSinkRepresentationPurger (subsink) {
+    subsink.purge();
+  }
   SinkRepresentation.prototype.purge = function () {
     console.log('purging');
-    lib.traverseShallow(this.subsinks,function (subsink) {
-      subsink.purge();
-      //subsink.destroy(); //this looks like a baad idea
-    });
+    lib.traverseShallow(this.subsinks,subSinkRepresentationPurger);
     //this.subsinks = {}; //this looks like a baad idea...
     this.purgeState();
-    //this.purgeData();
   };
   SinkRepresentation.prototype.purgeState = function () {
     var dp = new DataPurger(this.state);
     this.stateEvents.attachTo(dp);
     dp.run();
     //delitems.forEach(this.onStream.bind(this));
-  };
-  SinkRepresentation.prototype.purgeData = function () {
-    var wasfull = this.data.length>0;
-    while (this.data.length) {
-      this.dataEvents.onRecordDeletion.fire(this.data.pop());
-    }
-    if (wasfull) {
-      this.dataEvents.onDelete.fire(null);
-    }
   };
   SinkRepresentation.prototype.connectEventHandlers = function (eventhandlers) {
     if (!eventhandlers) {
@@ -827,23 +825,14 @@ function createUserRepresentation(execlib) {
     if (eventhandlers.state) {
       this.stateEvents.addConsumers(eventhandlers.state);
     }
-    if (eventhandlers.data) {
-      lib.traverseShallow(eventhandlers.data, this.attachDataEventHandler.bind(this));
-    }
     } catch(e) {
       console.error(e.stack);
       console.error(e);
     }
   };
-  SinkRepresentation.prototype.attachDataEventHandler = function (handler, eventname) {
-    var de = this.dataEvents[eventname];
-    if (!de) {
-      return;
-    }
-    return de.attach(handler);
-  };
   SinkRepresentation.prototype.monitorDataForGui = function (cb) {
-    return this.dataEvents.monitorForGui(cb);
+    console.error('monitorDataForGui has no implementation for now');
+    return null;
   };
   function setter(map, cb, cbname) {
     var mapval = map.get(cbname);
@@ -897,17 +886,13 @@ function createUserRepresentation(execlib) {
       this.handleSinkInfo(d, sink, subsinkinfoextras);
       this.stateEvents.attachTo(sink);
       if(sink.recordDescriptor){
-        taskRegistry.run('materializeQuery',this.produceDataMaterializationPropertyHash(sink));
+        //taskRegistry.run('materializeQuery',this.produceDataMaterializationPropertyHash(sink));
       }
+      this.sinkWaiters.resolve(sink);
     }
+    subsinkinfoextras = null;
+    sink = null;
     return d.promise;
-  };
-  SinkRepresentation.prototype.produceDataMaterializationPropertyHash = function (sink) {
-    var ret = this.dataEvents.listenerPack();
-    ret.sink = sink;
-    ret.data = this.data;
-    ret.continuous = true;
-    return ret;
   };
   SinkRepresentation.prototype.handleSinkInfo = function (defer, sink, subsinkinfoextras) {
     if (!sink) {
@@ -931,6 +916,11 @@ function createUserRepresentation(execlib) {
     }
     activationobj.run(sinkstate);
   };
+  function subSinkInfoExtraHandler(subsinkinfoextras, esubsinkinfo) {
+    if (esubsinkinfo[0] === ssname) {
+      subsubsinkinfoextras.push(esubsinkinfo.slice(1));
+    }
+  }
   SinkRepresentation.prototype.subSinkInfo2SubInit = function (sswaitable, activationobj, subsinkinfoextras, ss) {
     var ssname = sinkNameName(ss.name),
       subsink,
@@ -940,11 +930,7 @@ function createUserRepresentation(execlib) {
     }
     subsink = this.subsinks[ssname]; 
     if (subsinkinfoextras) {
-      subsinkinfoextras.forEach(function (esubsinkinfo) {
-        if (esubsinkinfo[0] === ssname) {
-          subsubsinkinfoextras.push(esubsinkinfo.slice(1));
-        }
-      });
+      subsinkinfoextras.forEach(subSinkInfoExtraHandler.bind(null, subsinkinfoextras));
     }
     //console.log(subsinkinfoextras, '+', ssname, '=>', subsubsinkinfoextras);
     if (!subsink) {
@@ -967,6 +953,8 @@ function createUserRepresentation(execlib) {
       });
     }
     */
+    subsubsinkinfoextras = null;
+    ssname = null;
   };
   SinkRepresentation.prototype.subSinkActivated = function (activationobj, ssname, subsink, subsubsinkinfoextras, subsubsink) {
     var ssp = subsink.setSink(subsubsink, subsubsinkinfoextras);
