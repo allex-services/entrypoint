@@ -1,13 +1,3 @@
-var Url = require('url');
-
-function resEnder (res, string) {
-  return function () {
-    res.end(string);
-    res = null;
-    string = null;
-  }
-}
-
 function createEntryPointService(execlib, ParentService) {
   'use strict';
   var lib = execlib.lib,
@@ -112,32 +102,6 @@ function createEntryPointService(execlib, ParentService) {
   EntryPointService.prototype.acquirePort = function(defer){
     console.log('MY PORT',this.port);
     defer.resolve(this.port);
-  };
-  EntryPointService.prototype._onRequest = function(req,res){
-    var url = Url.parse(req.url,true),
-      query = url.query,
-      mymethodname = url.pathname.substring(1),
-      mymethod = this[mymethodname],
-      isanonymous = this.anonymousMethods.indexOf(mymethodname)>=0,
-      targetmethodlength = isanonymous ? 3 : 3;
-    //any mymethod has to accept (url,req,res),
-    if('function' !== typeof mymethod){
-      res.end('');
-      return;
-    }
-    if(mymethod.length!==targetmethodlength){
-      res.end(mymethodname+' length '+mymethod.length+' is not '+targetmethodlength);
-      return;
-    }
-    if (isanonymous) {
-      if (this.allowAnonymous) {
-        mymethod.call(this, url, req, res);
-      } else {
-        res.end('');
-      }
-    } else {
-      mymethod.call(this, url, req, res);
-    }
   };
   EntryPointService.prototype.authenticate = function(credentials){
     if(!this.strategynames){
@@ -257,7 +221,7 @@ function createEntryPointService(execlib, ParentService) {
       .then(null,console.log.bind(console, 'checkSession failed'))
       .done(
         this.doLetHimIn.bind(this, res),
-        resEnder(res, '')
+        this.resEnder(res, '')
       );
       return;
     }
@@ -282,7 +246,7 @@ function createEntryPointService(execlib, ParentService) {
     .then(null, console.log.bind(console, 'chooseTarget failed'))
     .done(
       this.onTargetChosen.bind(this,res,identityobj),
-      resEnder(res, '')
+      this.resEnder(res, '')
     );
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
@@ -295,7 +259,7 @@ function createEntryPointService(execlib, ParentService) {
         this.onSessionDeleted.bind(this, res)
       )
       .fail(
-        resEnder(res, '')
+        this.resEnder(res, '')
       );
     } else {
       console.log('no session', url.query.session);
@@ -342,8 +306,8 @@ function createEntryPointService(execlib, ParentService) {
     console.log('should logout', userhash);
     targetobj.target.sink.call('logout', userhash.userhash.profile.username)
     .done(
-      resEnder(res, 'ok'),
-      resEnder(res, '')
+      this.resEnder(res, 'ok'),
+      this.resEnder(res, '')
     );
     } catch(e) {
       console.error(e.stack);
@@ -354,7 +318,7 @@ function createEntryPointService(execlib, ParentService) {
     this.extractRequestParams(url, req).then(
       this.onRegisterParams.bind(this, res)
     ).catch(
-      resEnder(res, '')
+      this.resEnder(res, '')
     );
   };
   EntryPointService.prototype.onRegisterParams = function (res, registerobj) {
@@ -373,7 +337,7 @@ function createEntryPointService(execlib, ParentService) {
     ).then(
       this.doLetHimIn.bind(this, res)
     ).catch(function(reason){
-      resEnder(res, '')
+      this.resEnder(res, '')
     });
   };
   EntryPointService.prototype.onRegisterFailed = function (res, result) {
@@ -384,7 +348,7 @@ function createEntryPointService(execlib, ParentService) {
     this.extractRequestParams(url, req).then(
       this.onUserNameForCheck.bind(this, res)
     ).catch(
-      resEnder(res, '')
+      this.resEnder(res, '')
     );
   };
   EntryPointService.prototype.onUserNameForCheck = function (res, usernameobj) {
@@ -399,30 +363,8 @@ function createEntryPointService(execlib, ParentService) {
     }
     this.remoteDBSink.call('usernameExists',username).done(
       res.end.bind(res),
-      resEnder(res, 'false')
+      this.resEnder(res, 'false')
     );
-  };
-  EntryPointService.prototype.extractRequestParams = function(url, req, defer){
-    defer = defer || q.defer();
-    if (req.method==='GET') {
-      defer.resolve(url.query);
-      return defer.promise;
-    }
-    if (req.method==='PUT') {
-      this.readRequestBody(req, defer);
-      return defer.promise;
-    }
-    return defer.promise;
-  };
-  EntryPointService.prototype.readRequestBody = function (req, defer) {
-    defer = defer || q.defer();
-    var body = '';
-    req.on('end', defer.resolve.bind(defer,body));
-    req.on('error', defer.reject.bind(defer));
-    req.on('data', function(chunk) {
-      body += chunk;
-    });
-    return defer.promise;
   };
   EntryPointService.prototype.onSessionRead = function (session, record) {
     if (record) {
@@ -532,7 +474,7 @@ function createEntryPointService(execlib, ParentService) {
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
     .then(null, console.log.bind(console, 'introduceSession failed'))
     .done(
-      resEnder(res,JSON.stringify({
+      this.resEnder(res,JSON.stringify({
         ipaddress:ipaddress,
         port:port,
         session:session
