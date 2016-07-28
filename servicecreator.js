@@ -221,7 +221,7 @@ function createEntryPointService(execlib, ParentService) {
       .then(null,console.log.bind(console, 'checkSession failed'))
       .done(
         this.doLetHimIn.bind(this, res),
-        this.resEnder(res, '')
+        this.resEnder(res, '{}')
       );
       return;
     }
@@ -232,12 +232,12 @@ function createEntryPointService(execlib, ParentService) {
     ).then(
       this.doLetHimIn.bind(this, res)
     ).catch(function(reason){
-      res.end('');
+      res.end('{}');
     });
   };
   EntryPointService.prototype.doLetHimIn = function (res, identityobj) {
     if(!(identityobj && identityobj.session)){
-      res.end('');
+      res.end('{}');
       return;
     }
 
@@ -246,7 +246,7 @@ function createEntryPointService(execlib, ParentService) {
     .then(null, console.log.bind(console, 'chooseTarget failed'))
     .done(
       this.onTargetChosen.bind(this,res,identityobj),
-      this.resEnder(res, '')
+      this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
@@ -259,11 +259,11 @@ function createEntryPointService(execlib, ParentService) {
         this.onSessionDeleted.bind(this, res)
       )
       .fail(
-        this.resEnder(res, '')
+        this.resEnder(res, '{}')
       );
     } else {
       console.log('no session', url.query.session);
-      res.end('');
+      res.end('{}');
     }
   };
   EntryPointService.prototype.deleteSession = function (session, userhash, defer) {
@@ -307,7 +307,7 @@ function createEntryPointService(execlib, ParentService) {
     targetobj.target.sink.call('logout', userhash.userhash.profile.username)
     .done(
       this.resEnder(res, 'ok'),
-      this.resEnder(res, '')
+      this.resEnder(res, '{}')
     );
     } catch(e) {
       console.error(e.stack);
@@ -318,7 +318,7 @@ function createEntryPointService(execlib, ParentService) {
     this.extractRequestParams(url, req).then(
       this.onRegisterParams.bind(this, res)
     ).catch(
-      this.resEnder(res, '')
+      this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.onRegisterParams = function (res, registerobj) {
@@ -328,7 +328,7 @@ function createEntryPointService(execlib, ParentService) {
     }
     this.remoteDBSink.call('registerUser',registerobj).done(
       this.onRegisterSucceeded.bind(this, res, registerobj),
-      this.onRegisterFailed.bind(this, res)
+      this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.onRegisterSucceeded = function (res, registerobj, result) {
@@ -337,24 +337,20 @@ function createEntryPointService(execlib, ParentService) {
     ).then(
       this.doLetHimIn.bind(this, res)
     ).catch(function(reason){
-      this.resEnder(res, '')
+      this.resEnder(res, '{}')
     });
-  };
-  EntryPointService.prototype.onRegisterFailed = function (res, result) {
-    //console.log('register nok', result);
-    res.end('');
   };
   EntryPointService.prototype.usernameExists = function (url, req, res) {
     this.extractRequestParams(url, req).then(
       this.onUserNameForCheck.bind(this, res)
     ).catch(
-      this.resEnder(res, '')
+      this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.onUserNameForCheck = function (res, usernameobj) {
     var username = usernameobj ? usernameobj.username : null;
     if(!username){
-      res.end('');
+      res.end('{}');
       return;
     }
     if(!this.remoteDBSink){
@@ -479,7 +475,7 @@ function createEntryPointService(execlib, ParentService) {
         port:port,
         session:session
       })),
-      res.end.bind(res, '')
+      res.end.bind(res, '{}')
     );
   };
   EntryPointService.prototype.anonymousMethods = ['register', 'letMeInOnce'];
