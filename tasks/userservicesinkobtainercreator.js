@@ -117,7 +117,8 @@ function createUserServiceSinkObtainer (execlib) {
         task: this,
         session: session,
         sink: sink,
-        taskRegistry: taskRegistry
+        taskRegistry: taskRegistry,
+        execlib: execlib
       });
     }
   };
