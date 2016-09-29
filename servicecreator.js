@@ -369,7 +369,7 @@ function createEntryPointService(execlib, ParentService) {
         username: record.username
       }).then(this.onUserFetched.bind(this, session));
     } else {
-      return q.reject(new lib.Error('SESSION_DOES_NOT_EXIST'));
+      return q.reject(new lib.Error('SESSION_DOES_NOT_EXIST', session));
     }
   };
   EntryPointService.prototype.onUserFetched = function (session, userhash) {
