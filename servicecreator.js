@@ -1,11 +1,15 @@
-function createEntryPointService(execlib, ParentService) {
+function createEntryPointService(execlib, ParentService, AuthenticationService) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
     execSuite = execlib.execSuite,
     taskRegistry = execSuite.taskRegistry,
     qlib = lib.qlib,
-    TargetContainer = require('./targetcontainercreator')(execlib);
+    TargetContainer = require('./targetcontainercreator')(execlib),
+    FBPhoneStrategy = require('./fbstrategycreator')(execlib);
+
+
+  AuthenticationService.prototype.strategyCtors.add('fb', FBPhoneStrategy);
 
   function factoryCreator(parentFactory) {
     return {
@@ -46,7 +50,6 @@ function createEntryPointService(execlib, ParentService) {
         onSink: this.onRemoteDBSink.bind(this)
       });
     }
-    this.strategynames = Object.keys(prophash.strategies);
     this.sessionsSinkName = prophash.sessionsDB;
     this.sessionsDBSinkFinder = null;
     if (this.sessionsSinkName) {
@@ -73,7 +76,6 @@ function createEntryPointService(execlib, ParentService) {
       sw.destroy();
     }
     this.sessionsSinkName = null;
-    this.strategynames = null;
     if(!this.targets){
       return;
     }
@@ -102,22 +104,6 @@ function createEntryPointService(execlib, ParentService) {
   EntryPointService.prototype.acquirePort = function(defer){
     console.log('MY PORT',this.port);
     defer.resolve(this.port);
-  };
-  EntryPointService.prototype.authenticate = function(credentials){
-    if(!this.strategynames){
-      return q(null);
-    }
-    if(!this.authenticator){
-      console.trace();
-      console.error('How come EntryPointService has no authenticator?!');
-      return q(null);
-    }
-    var resolveobj = {};
-    this.strategynames.forEach(function(stratname){
-      resolveobj[stratname] = credentials;
-    });
-    credentials = null;
-    return this.authenticator.call('resolve',resolveobj);
   };
   EntryPointService.prototype.onAuthenticator = function (authsink) {
     if(!this.destroyed){
@@ -358,8 +344,15 @@ function createEntryPointService(execlib, ParentService) {
       return;
     }
     this.remoteDBSink.call('usernameExists',username).done(
-      res.end.bind(res),
-      this.resEnder(res, 'false')
+      (ueresult) => {
+        res.end(JSON.stringify({
+          username: username,
+          exists: ueresult
+        }));
+        res = null;
+        username = null;
+      },
+      this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.onSessionRead = function (session, record) {
@@ -478,7 +471,7 @@ function createEntryPointService(execlib, ParentService) {
       res.end.bind(res, '{}')
     );
   };
-  EntryPointService.prototype.anonymousMethods = ['register', 'letMeInOnce'];
+  EntryPointService.prototype.anonymousMethods = ['register'];
   
   return EntryPointService;
 }
