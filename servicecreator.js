@@ -6,6 +6,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
     taskRegistry = execSuite.taskRegistry,
     qlib = lib.qlib,
     TargetContainer = require('./targetcontainercreator')(execlib),
+    ClusterRepresentativeHunter = require('./clusterrepresentativehuntercreator')(execlib),
     FBPhoneStrategy = require('./fbstrategycreator')(execlib);
 
 
@@ -378,12 +379,21 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
 
   //target handling fun
   var _instancenameTargetPrefix = 'instancename:';
+  var _clusterRepresentativePrefix = 'clusterrepresentative:';
   EntryPointService.prototype.processTarget = function(target){
     if(target.indexOf(_instancenameTargetPrefix)===0){
       this.huntSingleTarget(target.substring(_instancenameTargetPrefix.length));
     }
+    if(target.indexOf(_clusterRepresentativePrefix)===0){
+      this.huntClusterRepresentative(target.substring(_clusterRepresentativePrefix.length));
+    }
   };
   EntryPointService.prototype.huntSingleTarget = function(sinkname){
+    var jsonsinkname;
+    try {
+      jsonsinkname = JSON.parse(sinkname);
+      sinkname = jsonsinkname;
+    } catch (ignore) { }
     console.log('SHOULD HUNT FOR SINGLE TARGET', sinkname);
     taskRegistry.run('findAndRun',{
       program: {
@@ -417,7 +427,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
   };
   EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
     //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.wsport,'=>',eaddress,eport);
-    try {
     var tc;
     sinkinfo.ipaddress = eaddress;
     sinkinfo.wsport = eport;
@@ -432,9 +441,29 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       }
       this.huntSingleTarget(sinkname);
     }
-    } catch(e) {
-      console.error(e.stack);
-      console.error(e);
+  };
+  EntryPointService.prototype.huntClusterRepresentative = function (clusterrepresentativearrayjson) {
+    console.log('clusterrepresentativearray', clusterrepresentativearray);
+    var clusterrepresentativeid, clusterrepresentativearray, sinkname, hunter;
+    try {
+      clusterrepresentativearray = JSON.parse(clusterrepresentativearrayjson);
+    } catch (e) {
+      throw new lib.Error('CLUSTER_REPRESENTATIVE_MUST_BE_A_JSON_ARRAY', 'clusterrepresentativearray must be a JSON stringified Array');
+    }
+    if (!lib.isArray(clusterrepresentativearray)) {
+      throw new lib.Error('CLUSTER_REPRESENTATIVE_NOT_AN_ARRAY', 'clusterrepresentative must be an Array');
+    }
+    if (clusterrepresentativearray.length !== 2) {
+      throw new lib.Error('CLUSTER_REPRESENTATIVE_MUST_HAVE_TWO_ELEMENTS', 'clusterrepresentative must have 2 elements: Clusters name and gateway name');
+    }
+    clusterrepresentativeid = clusterrepresentativearray.join('|');
+    sinkname = [
+      {name: clusterrepresentativearray[0], identity: {name: 'monitor', role: 'monitor'}},
+      clusterrepresentativearray[1]];
+    hunter = this.targets.get(clusterrepresentativeid);
+    if (!hunter) {
+      hunter = new ClusterRepresentativeHunter(sinkname);
+      this.targets.add(clusterrepresentativeid, hunter);
     }
   };
   function firstTargetChooser(targetobj,target,targetname){
@@ -450,7 +479,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
     return defer.promise;
   };
   EntryPointService.prototype.onTargetChosen = function(res,identityobj,targetobj){
-    if(!targetobj.target){
+    if(!(targetobj.target && targetobj.target.sink)){
       console.log('onTargetChosen, but no target?', targetobj);
       res.end(JSON.stringify({error:'NO_TARGETS_YET'}));
       return;
@@ -463,13 +492,28 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
     .then(null, console.log.bind(console, 'introduceSession failed'))
     .done(
-      this.resEnder(res,JSON.stringify({
+      this.onTargetSessionIntroduced.bind(this, ipaddress, port, session, res),
+      res.end.bind(res, '{}')
+    );
+  };
+  EntryPointService.prototype.onTargetSessionIntroduced = function (ipaddress, port, session, res, response) {
+    var ret;
+    if (response && response.hasOwnProperty && response.hasOwnProperty('ipaddress') && response.hasOwnProperty('port')){
+      ret = {
+        ipaddress: response.ipaddress,
+        port: response.port,
+        session: session
+      };
+    } else if (response === session) {
+      ret = {
         ipaddress:ipaddress,
         port:port,
         session:session
-      })),
-      res.end.bind(res, '{}')
-    );
+      };
+    } else {
+      ret = {error:'NO_TARGETS_YET'};
+    }
+    res.end(JSON.stringify(ret));
   };
   EntryPointService.prototype.anonymousMethods = ['register'];
   
