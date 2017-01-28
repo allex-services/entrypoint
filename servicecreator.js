@@ -291,6 +291,10 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       return;
     }
     console.log('should logout', userhash);
+    if(!(userhash && userhash.userhash && userhash.userhash.profile && userhash.userhash.profile.username)){
+      res.end(JSON.stringify({}));
+      return;
+    }
     targetobj.target.sink.call('logout', userhash.userhash.profile.username)
     .done(
       this.resEnder(res, 'ok'),
