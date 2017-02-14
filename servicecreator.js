@@ -137,12 +137,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
   };
   EntryPointService.prototype.getSession = execSuite.dependentServiceMethod([], ['sessions'], function (sessions, session, defer) {
     //console.log('getSession from', sessions.role);
-    /*
-    sessions.call('findSession', session).then(
-      defer.resolve.bind(defer),
-      this.onSessionNotFound.bind(this, session, defer)
-    );
-    */
     taskRegistry.run('readFromDataSink', {
       sink: sessions,
       filter: {
@@ -213,8 +207,13 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       return;
     }
     this.extractRequestParams(url, req).then(
-      this.authenticate.bind(this)
-    ).then(
+      this.letUserHashIn.bind(this, res)
+    ).catch(function(reason){
+      res.end('{}');
+    });
+  };
+  EntryPointService.prototype.letUserHashIn = function (res, userhash) {
+    this.authenticate(userhash).then(
       this.processResolvedUser.bind(this)
     ).then(
       this.doLetHimIn.bind(this, res)
@@ -314,7 +313,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
   };
   EntryPointService.prototype.onRegisterParams = function (res, registerobj) {
     if(!this.remoteDBSink){
-      res.end('service is currently down');
+      res.end(JSON.stringify({error: 'NO_DB_YET'}));
       return;
     }
     this.remoteDBSink.call('registerUser',registerobj).done(
