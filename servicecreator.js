@@ -344,7 +344,9 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       return;
     }
     if(!this.remoteDBSink){
-      res.end('service is currently down');
+      res.end(JSON.stringify({
+        error: 'NO_DB_YET'
+      }));
       return;
     }
     this.remoteDBSink.call('usernameExists',username).done(
@@ -360,6 +362,9 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
     );
   };
   EntryPointService.prototype.onSessionRead = function (session, record) {
+    if (!this.remoteDBSink) {
+      return q.reject(new lib.Error('NO_DB_YET', session));
+    }
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
       return this.remoteDBSink.call('fetchUser', {
