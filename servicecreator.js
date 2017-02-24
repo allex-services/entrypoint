@@ -199,10 +199,16 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
   EntryPointService.prototype.letMeIn = function(url,req,res){
     if(url && url.query && url.query.session){
       this.checkSession(url.query.session)
-      .then(null,console.log.bind(console, 'checkSession failed'))
       .done(
         this.doLetHimIn.bind(this, res),
-        this.resEnder(res, '{}')
+        function (error) {
+          res.end( JSON.stringify(
+            error && error.code ?
+              {error:error.code}:
+              {}
+          ));
+          res = null;
+        }
       );
       return;
     }
@@ -210,6 +216,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       this.letUserHashIn.bind(this, res)
     ).catch(function(reason){
       res.end('{}');
+      res = null;
     });
   };
   EntryPointService.prototype.letUserHashIn = function (res, userhash) {
@@ -219,6 +226,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
       this.doLetHimIn.bind(this, res)
     ).catch(function(reason){
       res.end('{}');
+      res = null;
     });
   };
   EntryPointService.prototype.doLetHimIn = function (res, identityobj) {
