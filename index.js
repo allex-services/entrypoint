@@ -3,7 +3,7 @@ function createServicePack(execlib){
 
   return {
     service: {
-      dependencies: ['allex:httpexecutor', '.authentication']
+      dependencies: ['allex:httpexecutor', '.authentication', 'allex:fakehttpresponse:lib']
     },
     sinkmap: {
       dependencies: ['allex:httpexecutor']

@@ -1,4 +1,4 @@
-function createEntryPointService(execlib, ParentService, AuthenticationService) {
+function createEntryPointService(execlib, ParentService, AuthenticationService, AllexResponse) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -15,7 +15,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService) 
   function factoryCreator(parentFactory) {
     return {
       'service': require('./users/serviceusercreator')(execlib, parentFactory.get('service')),
-      'user': require('./users/usercreator')(execlib, parentFactory.get('user')) 
+      'user': require('./users/usercreator')(execlib, parentFactory.get('user'), AllexResponse) 
     };
   }
 

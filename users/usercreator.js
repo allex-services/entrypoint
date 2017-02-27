@@ -1,10 +1,9 @@
-function createUser(execlib, ParentUser) {
+function createUser(execlib, ParentUser, AllexResponse) {
   'use strict';
 
   var lib = execlib.lib,
     q = lib.q,
-    qlib = lib.qlib,
-    AllexResponse = require('../allexresponsecreator')(execlib);
+    qlib = lib.qlib;
 
   if(!ParentUser) {
     ParentUser = execlib.execSuite.ServicePack.Service.prototype.userFactory.get('user');
