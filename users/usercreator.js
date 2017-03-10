@@ -30,7 +30,6 @@ function createUser(execlib, ParentUser, AllexResponse) {
       defer = null;
       return;
     }
-    console.log('checkres:', checkres);
     if (!checkres.exists) {
       if (!doregister) {
         defer.reject(new lib.Error('USERNAME_NOT_FOUND', checkres.username));
