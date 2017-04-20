@@ -5,5 +5,8 @@ module.exports = {
   },{
     title: 'Register if not Found',
     type: 'boolean'
+  },{
+    title: 'Keep Password if Found',
+    type: 'boolean'
   }]
 };

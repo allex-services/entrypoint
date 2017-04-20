@@ -17,7 +17,15 @@ function createUser(execlib, ParentUser, AllexResponse) {
     ParentUser.prototype.__cleanUp.call(this);
   };
 
-  User.prototype.announceUser = function (userhash, doregister, defer) {
+  User.prototype.announceUser = function (userhash, doregister, keeppassword, defer) {
+    if (keeppassword) {
+      this.announceUserWithNoPasswordChange(userhash, doregister, defer);
+    } else {
+      this.announceUserWithPasswordChange(userhash, doregister, defer);
+    }
+  };
+
+  User.prototype.announceUserWithPasswordChange = function (userhash, doregister, defer) {
     var checkres = new AllexResponse(), p = checkres.defer.promise;
     this.__service.onUserNameForCheck(checkres, userhash);
     qlib.promise2decision(p, this.existenceChecker.bind(this, userhash, doregister, defer));
@@ -31,14 +39,7 @@ function createUser(execlib, ParentUser, AllexResponse) {
       return;
     }
     if (!checkres.exists) {
-      if (!doregister) {
-        defer.reject(new lib.Error('USERNAME_NOT_FOUND', checkres.username));
-        defer = null;
-        return;
-      }
-      res = new AllexResponse(defer);
-      userhash.password = lib.uid();
-      this.__service.onRegisterParams(res, userhash);
+      this.onNoUserToAnnounce(userhash, checkres.username, doregister, defer);
     } else {
       if(!(this.__service && this.__service.remoteDBSink)){
         defer.reject(new lib.Error('NO_DB_YET', checkres.username));
@@ -56,7 +57,45 @@ function createUser(execlib, ParentUser, AllexResponse) {
 
   User.prototype.onAnnouncedUserPasswordChanged = function (userhash, defer) {
     var res = new AllexResponse(defer);
+    console.log('let him in?', userhash);
     this.__service.letUserHashIn(res, userhash);
+  };
+  
+  User.prototype.announceUserWithNoPasswordChange = function (userhash, doregister, defer) {
+    if (!this.__service.remoteDBSink) {
+      defer.reject(new lib.Error('NO_DB_YET', 'DB is not connected'));
+      return;
+    }
+    this.__service.remoteDBSink.call('fetchUser', userhash).then(
+      this.onAnnouncedUserFetched.bind(this, userhash, doregister, defer),
+      defer.reject.bind(defer)
+    )
+  };
+
+  User.prototype.onAnnouncedUserFetched = function (userhash, doregister, defer, fetchresult) {
+    var res;
+    console.log('fetchresult', fetchresult);
+    if (!fetchresult) {
+      this.onNoUserToAnnounce(userhash, userhash.username, doregister, defer);
+    } else {
+      res = new AllexResponse(defer);
+      lib.extend(fetchresult.profile, userhash);
+      console.log('let him in?', fetchresult);
+      this.__service.processResolvedUser(fetchresult).then(
+        this.__service.doLetHimIn.bind(this.__service, res)
+      );
+    }
+  };
+
+  User.prototype.onNoUserToAnnounce = function (userhash, username, doregister, defer) {
+    if (!doregister) {
+      defer.reject(new lib.Error('USERNAME_NOT_FOUND', username));
+      defer = null;
+      return;
+    }
+    res = new AllexResponse(defer);
+    userhash.password = lib.uid();
+    this.__service.onRegisterParams(res, userhash);
   };
 
   return User;

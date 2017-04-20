@@ -6,8 +6,20 @@ module.exports = {
 };
 
 },{}],3:[function(require,module,exports){
-arguments[4][2][0].apply(exports,arguments)
-},{"dup":2}],4:[function(require,module,exports){
+module.exports = {
+  announceUser: [{
+    title: 'User Identity Object',
+    type: 'object'
+  },{
+    title: 'Register if not Found',
+    type: 'boolean'
+  },{
+    title: 'Keep Password if Found',
+    type: 'boolean'
+  }]
+};
+
+},{}],4:[function(require,module,exports){
 function sinkMapCreator(execlib,ParentSinkMap){
   'use strict';
   execlib.execSuite.UserRepresentation = require('./userrepresentationcreator')(execlib);
