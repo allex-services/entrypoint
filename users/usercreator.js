@@ -32,7 +32,6 @@ function createUser(execlib, ParentUser, AllexResponse) {
   };
 
   User.prototype.existenceChecker = function (userhash, doregister, defer, checkres) {
-    var res;
     if (!checkres) {
       defer.reject(new lib.Error('ERROR_IN_CHECKING_USERNAME', userhash.username));
       defer = null;
@@ -57,7 +56,6 @@ function createUser(execlib, ParentUser, AllexResponse) {
 
   User.prototype.onAnnouncedUserPasswordChanged = function (userhash, defer) {
     var res = new AllexResponse(defer);
-    console.log('let him in?', userhash);
     this.__service.letUserHashIn(res, userhash);
   };
   
@@ -74,13 +72,11 @@ function createUser(execlib, ParentUser, AllexResponse) {
 
   User.prototype.onAnnouncedUserFetched = function (userhash, doregister, defer, fetchresult) {
     var res;
-    console.log('fetchresult', fetchresult);
     if (!fetchresult) {
       this.onNoUserToAnnounce(userhash, userhash.username, doregister, defer);
     } else {
       res = new AllexResponse(defer);
       lib.extend(fetchresult.profile, userhash);
-      console.log('let him in?', fetchresult);
       this.__service.processResolvedUser(fetchresult).then(
         this.__service.doLetHimIn.bind(this.__service, res)
       );
@@ -88,6 +84,7 @@ function createUser(execlib, ParentUser, AllexResponse) {
   };
 
   User.prototype.onNoUserToAnnounce = function (userhash, username, doregister, defer) {
+    var res;
     if (!doregister) {
       defer.reject(new lib.Error('USERNAME_NOT_FOUND', username));
       defer = null;
