@@ -9,7 +9,7 @@ function createServicePack(execlib){
       dependencies: ['allex:httpexecutor']
     },
     tasks: {
-      dependencies: []
+      dependencies: ['allex:userrepresentation:lib']
     }
   };
 }
