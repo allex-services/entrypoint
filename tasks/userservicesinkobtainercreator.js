@@ -56,6 +56,7 @@ function createUserServiceSinkObtainer (execlib) {
     lib.runNext(this.goForLetMeIn.bind(this, address, port), lib.intervals.Second);
   };
   UserServiceSinkObtainerTask.prototype.onLetMeIn = function (address, port, responseobj) {
+    console.log('onLetMeIn', arguments);
     if (!(responseobj && responseobj.data)) {
       console.log('bad login', this.identity);
       this.cb({

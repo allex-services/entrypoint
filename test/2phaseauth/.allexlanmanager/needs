@@ -4,7 +4,7 @@
     "instancename": "Hotel",
     "propertyhash": {
       "usermodule": {
-        "namespace": "",
+        "namespace": "bcspaymentusers",
         "basename": ""
       }
     }
@@ -14,7 +14,7 @@
     "instancename": "UsersDBResolver",
     "propertyhash": {
       "data": {
-        "modulename": "allex_genericuserdataservice",
+        "modulename": "allex__bcsystemdata_adminsservice",
         "storage": {
           "modulename": "allex_mongostorage",
           "propertyhash": {
@@ -30,13 +30,15 @@
   {
     "modulename": "allex_usersessionsservice",
     "instancename": "UserSessions",
-    "storage": {
-      "modulename": "allex_mongostorage",
-      "propertyhash": {
-        "server": "127.0.0.1",
-        "database": "test2phaseauth",
-        "table": "sessions",
-        "_idname": "session"
+    "propertyhash": {
+      "storage": {
+        "modulename": "allex_mongostorage",
+        "propertyhash": {
+          "server": "127.0.0.1",
+          "database": "test2phaseauth",
+          "table": "sessions",
+          "_idname": "session"
+        }
       }
     }
   },
@@ -47,12 +49,22 @@
       "port": "11321",
       "target": "instancename:Hotel",
       "allowAnonymous": true,
+      "sessionsDB": "UserSessions",
       "strategies": {
         "remote": {
           "sinkname": "UsersDBResolver",
           "identity": {
             "role": "user",
             "name": "user"
+          }
+        }
+      },
+      "secondfactorauthmodules": {
+        "sms": {
+          "modulename": "allex__bcsystem_smsauthlib",
+          "propertyhash": {
+            "username": "sms_sender",
+            "password": "testsms"
           }
         }
       }

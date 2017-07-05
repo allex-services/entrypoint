@@ -53,6 +53,8 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     this.sessionsSinkName = prophash.sessionsDB;
     this.sessionsDBSinkFinder = null;
+    this.secondFactorAuthModules = prophash.secondfactorauthmodules;
+    this.secondFactorAuthenticators = new lib.Map();
     if (this.sessionsSinkName) {
       this.sessionsDBSinkFinder = taskRegistry.run('findSink', {
         sinkname: this.sessionsSinkName,
@@ -67,6 +69,12 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
   }
   ParentService.inherit(EntryPointService,factoryCreator);
   EntryPointService.prototype.__cleanUp = function () {
+    if (this.secondFactorAuthenticators) {
+      lib.arryDestroyAll(this.secondFactorAuthenticators);
+      this.secondFactorAuthenticators.destroy();
+    }
+    this.secondFactorAuthenticators = null;
+    this.secondFactorAuthModules = null;
     if (this.sessionsDBSinkFinder) {
       this.sessionsDBSinkFinder.destroy();
     }
@@ -116,7 +124,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       console.error('no authsink');
       process.exit(0);
     }
-    this.readyToAcceptUsersDefer.resolve(true);
+    this.loadSecondFactorAuthModules();
   };
   EntryPointService.prototype.onRemoteDBSink = function (remotedbsink) {
     if(!this.destroyed){
@@ -125,12 +133,12 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     this.remoteDBSink = remotedbsink;
   };
-  EntryPointService.prototype.checkSession = function(session){
+  EntryPointService.prototype.checkSession = function(session, token){
     if (!this.sessionsSinkName) {
       return q.reject(new lib.Error('NO_SESSIONS_SUPPORT'));
     } else {
       return this.getSession(session).then(
-        this.onSessionRead.bind(this, session)
+        this.onSessionRead.bind(this, session, token)
       );
     }
     return defer.promise;
@@ -175,30 +183,33 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
   });
   EntryPointService.prototype.processResolvedUser = function (userhash) {
+    var secondphaseauth;
     if(!userhash){
       return q({userhash:null,session:null});
+    }
+    if (this.state.get('sessions') && userhash.profile && userhash.profile['secondphaseauth']) {
+      secondphaseauth = this.secondFactorAuthenticators.get(userhash.profile['secondphaseauth']);
+      if (secondphaseauth) {
+        return secondphaseauth.generateToken(userhash.profile).then(this.onSecondPhaseToken.bind(this, userhash));
+      }
     }
     return this.produceSession(userhash);
   };
   EntryPointService.prototype.produceSession = function(userhash){
     var session = lib.uid(),
       identityobj = {userhash:userhash,session:session},
-      sw = this.state.get('sessions'),
-      d;
+      sw = this.state.get('sessions');
     if (sw) {
-      d = q.defer() ;
-      sw.call('create', {session:session, username: userhash.name}).done(
-        d.resolve.bind(d,identityobj),
-        d.reject.bind(d)
+      return sw.call('create', {session:session, username: userhash.name}).then(
+        qlib.returner(identityobj)
       );
-      return d.promise;
     } else {
       return q(identityobj);
     }
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
     if(url && url.query && url.query.session){
-      this.checkSession(url.query.session)
+      this.checkSession(url.query.session, url.query.secondphasetoken)
       .done(
         this.doLetHimIn.bind(this, res),
         function (error) {
@@ -235,6 +246,13 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       return;
     }
 
+    if (identityobj.secondphase === true) {
+      res.end(JSON.stringify({
+        secondphase: identityobj.session
+      }));
+      return;
+    }
+
     //now, introduceSession to a __chosen__ target. __chosen__
     this.chooseTarget()
     .then(null, console.log.bind(console, 'chooseTarget failed'))
@@ -242,6 +260,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       this.onTargetChosen.bind(this,res,identityobj),
       this.resEnder(res, '{}')
     );
+    return;
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
     if(url && url.query && url.query.session){
@@ -369,18 +388,33 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       this.resEnder(res, '{}')
     );
   };
-  EntryPointService.prototype.onSessionRead = function (session, record) {
+  EntryPointService.prototype.onSessionRead = function (session, token, record) {
+    var spc;
     if (!this.remoteDBSink) {
       return q.reject(new lib.Error('NO_DB_YET', session));
     }
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
-      return this.remoteDBSink.call('fetchUser', {
-        username: record.username
-      }).then(this.onUserFetched.bind(this, session));
+      spc = this.checkForSecondPhaseUserName(record.username);
+      if (spc && 'username' in spc && 'token' in spc) {
+        if (token != spc.token) {
+          console.error('token', token, '!== db token', spc.token);
+          return q.reject(new lib.Error('SECONDPHASE_TOKEN_MISMATCH'));
+        }
+        record.username = spc.username;
+        return this.deleteSession(session, record).then(
+          this.fetchUserFromSessionRecord.bind(this, session)
+        );
+      }
+      return this.fetchUserFromSessionRecord(session, record);
     } else {
       return q.reject(new lib.Error('SESSION_DOES_NOT_EXIST', session));
     }
+  };
+  EntryPointService.prototype.fetchUserFromSessionRecord = function (session, record) {
+    return this.remoteDBSink.call('fetchUser', {
+      username: record.username
+    }).then(this.onUserFetched.bind(this, session));
   };
   EntryPointService.prototype.onUserFetched = function (session, userhash) {
     return q({userhash:userhash,session:session});
@@ -532,6 +566,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     res.end(JSON.stringify(ret));
   };
   EntryPointService.prototype.anonymousMethods = ['register'];
+  require('./secondfactorauthextension')(execlib, EntryPointService);
   
   return EntryPointService;
 }

@@ -1,10 +1,15 @@
 // allexenterandrun
 
+function go (taskobj) {
+  console.log('got sink', !!taskobj.sink);
+  process.exit(0);
+}
+
 module.exports = {
   sinkname: "EntryPoint",
   identity: {
-    username: 'user',
+    username: 'systemadmin',
     password: '123456'
   },
-  cb: console.log.bind(console, 'here we go')
+  cb: go
 };

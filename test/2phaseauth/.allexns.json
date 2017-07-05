@@ -1,0 +1,16 @@
+[
+{"username": "allex", "namespace": null, "group": "services", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_services"},
+{"username": "allex", "namespace": null, "group": "libs", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_libs"},
+{"username": "allex", "namespace": null, "group": "storages", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_storages"},
+{"username": "allex", "namespace": null, "group": "parsers", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_parsers"},
+{"username": "allex", "namespace": null, "group": "lowlevellibs", "type": "git", "user": "git", "server": "github.com", "repogroup": "allex-lowlevel-libs"},
+{"username": "allex", "namespace": null, "group": "cores", "type": "git", "user": "git", "server": "github.com", "repogroup": "allex-cores"},
+{"username": "allex", "namespace": null, "group": "clientcorelibs", "type": "git", "user": "git", "server": "github.com", "repogroup": "allex-clientcore-libs"},
+{"username": "allex", "namespace": null, "group": "serverruntimelibs", "type": "git", "user": "git", "server": "github.com", "repogroup": "allex-serverruntime-libs"},
+{"username": "allex", "namespace": "indata", "group": "libs", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_indata_libs"},
+{"username": "allex", "namespace": "indata", "group": "parsers", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_indata_parsers"},
+{"username": "allex", "namespace": "bcsystem", "group": "libs", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_bcsystem_libs"},
+{"username": "allex", "namespace": "bcsystemdata", "group": "services", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_bcsystemdata_services"},
+{"username": "allex", "namespace": "bcsystemusers", "group": "services", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_bcsystemusers_services"},
+{"username": "allex", "namespace": "bcspaymentusers", "group": "services", "type": "git", "user": "git", "server": "gitlab.hers.rs", "repogroup": "allex_bcspaymentusers_services"}
+]
