@@ -396,7 +396,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     if (record) {
       //now get the User DB record from remoteDBSink and resolve the defer with that record data
       spc = this.checkForSecondPhaseUserName(record.username);
-      if (spc && 'username' in spc && 'token' in spc) {
+      if (spc && 'object' === typeof spc && 'username' in spc && 'token' in spc) {
         if (token != spc.token) {
           console.error('token', token, '!== db token', spc.token);
           return q.reject(new lib.Error('SECONDPHASE_TOKEN_MISMATCH'));
