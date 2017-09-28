@@ -58,7 +58,11 @@ function createSecondFactorExtension (execlib, EntryPointService) {
     }
   };
   EntryPointService.prototype.checkForSecondPhaseUserName = function (username) {
-    var zsind = username.indexOf(zeroString);
+    var zsind;
+    if (!lib.isString(username)) {
+      return username;
+    }
+    zsind = username.indexOf(zeroString);
     if (zsind >= 0) {
       return {
         username: username.substring(0, zsind),
