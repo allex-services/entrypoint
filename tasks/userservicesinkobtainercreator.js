@@ -82,7 +82,7 @@ function createUserServiceSinkObtainer (execlib) {
       }
       console.log('will acquireSink on Users', response.ipaddress, ':', response.port);
       taskobj.task = taskRegistry.run('acquireSink',{
-        connectionString: 'ws://'+response.ipaddress+':'+response.port,
+        connectionString: ((response.port===443) ? 'wss://' : 'ws://')+response.ipaddress+':'+response.port,
         session: response.session,
         singleshot: true,
         onSink: this.onTargetSink.bind(this, taskobj, response.session)

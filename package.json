@@ -1,6 +1,6 @@
 {
   "name": "allex_entrypointservice",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "EntryPointService",
   "main": "index.js",
   "scripts": {
