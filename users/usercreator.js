@@ -28,7 +28,7 @@ function createUser(execlib, ParentUser, AllexResponse) {
   User.prototype.announceUserWithPasswordChange = function (userhash, doregister, defer) {
     var checkres = new AllexResponse(), p = checkres.defer.promise;
     this.__service.onUserNameForCheck(checkres, userhash);
-    qlib.promise2decision(p, this.existenceChecker.bind(this, userhash, doregister, defer));
+    p.then(this.existenceChecker.bind(this, userhash, doregister, defer));
   };
 
   User.prototype.existenceChecker = function (userhash, doregister, defer, checkres) {
@@ -40,13 +40,13 @@ function createUser(execlib, ParentUser, AllexResponse) {
     if (!checkres.exists) {
       this.onNoUserToAnnounce(userhash, checkres.username, doregister, defer);
     } else {
-      if(!(this.__service && this.__service.remoteDBSink)){
-        defer.reject(new lib.Error('NO_DB_YET', checkres.username));
+      if (!this.__service) {
+        defer.reject(new lib.Error('ALREADY_DESTROYED', 'This service instance is already dead'));
         defer = null;
         return;
       }
       userhash.password = lib.uid();
-      this.__service.remoteDBSink.call('forcePassword', checkres.username, userhash.password).then(
+      this.forceRemotePassword(checkres.username, userhash.password).then(
         this.onAnnouncedUserPasswordChanged.bind(this, userhash, defer),
         defer.reject.bind(defer)
       );
@@ -60,14 +60,10 @@ function createUser(execlib, ParentUser, AllexResponse) {
   };
   
   User.prototype.announceUserWithNoPasswordChange = function (userhash, doregister, defer) {
-    if (!this.__service.remoteDBSink) {
-      defer.reject(new lib.Error('NO_DB_YET', 'DB is not connected'));
-      return;
-    }
-    this.__service.remoteDBSink.call('fetchUser', userhash).then(
+    this.__service.fetchRemoteUser(userhash).then(
       this.onAnnouncedUserFetched.bind(this, userhash, doregister, defer),
       defer.reject.bind(defer)
-    )
+    );
   };
 
   User.prototype.onAnnouncedUserFetched = function (userhash, doregister, defer, fetchresult) {

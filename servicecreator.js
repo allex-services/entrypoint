@@ -1,44 +1,18 @@
-function createEntryPointService(execlib, ParentService, AuthenticationService, AllexResponse) {
+function createEntryPointService(execlib, ParentService, AuthenticationService, AllexResponse, remoteauthmixinslib, sessionsauthmixinslib) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
     execSuite = execlib.execSuite,
     taskRegistry = execSuite.taskRegistry,
     qlib = lib.qlib,
+    RemoteServiceListenerServiceMixin = execSuite.RemoteServiceListenerServiceMixin,
     TargetContainer = require('./targetcontainercreator')(execlib),
     ClusterRepresentativeHunter = require('./clusterrepresentativehuntercreator')(execlib),
-    RemoteAuthStrategy = AuthenticationService.prototype.strategyCtors.get('remote'),
-    FBPhoneStrategy = require('./fbstrategycreator')(execlib);
-
-  function SessionsAuthStrategy (prophash) {
-    RemoteAuthStrategy.call(this, prophash);
-  }
-  lib.inherit(SessionsAuthStrategy, RemoteAuthStrategy);
-  SessionsAuthStrategy.prototype.goResolve = function(credentials,defer){
-    try {
-    taskRegistry.run('readFromDataSink', { sink: this.sink,
-      singleshot: true,
-      filter: {
-        'op': 'eq',
-        field: 'session',
-        value: credentials.id
-      },
-      cb: this.onResolveSuccess.bind(this, defer),
-      errorcb: this.onResolveFail.bind(this, credentials, defer)
-    });
-    } catch(e) {
-      console.log(e);
-    }
-  };
-  SessionsAuthStrategy.prototype.onResolveSuccess = function (defer, result) {
-    if (result && result.username) {
-      result.name = result.username;
-    }
-    return RemoteAuthStrategy.prototype.onResolveSuccess.call(this, defer, result);
-  };
+    FBPhoneStrategy = require('./fbstrategycreator')(execlib),
+    RemoteStrategyServiceMixin = remoteauthmixinslib.service,
+    SessionsStrategyServiceMixin = sessionsauthmixinslib.service;
 
   AuthenticationService.prototype.strategyCtors.add('fb', FBPhoneStrategy);
-  AuthenticationService.prototype.strategyCtors.add('sessions', SessionsAuthStrategy);
 
   function factoryCreator(parentFactory) {
     return {
@@ -60,14 +34,12 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     if(!prophash.strategies){
       throw new lib.Error('NO_PROPHASH_STRATEGIES_FOR_ENTRYPOINT_SERVICE','EntryPointService constructor prophash misses the strategies hash');
     }
-    if (prophash.sessionsDB) {
-      prophash.strategies.sessions = {
-        sinkname: prophash.sessionsDB,
-        identity: {role: 'user', name: 'user'}
-      };
-    }
     this.port = prophash.port;
+    SessionsStrategyServiceMixin.makeupPropertyHash(prophash);
     ParentService.call(this, prophash);
+    RemoteServiceListenerServiceMixin.call(this);
+    RemoteStrategyServiceMixin.call(this, prophash);
+    SessionsStrategyServiceMixin.call(this, prophash);
     this.state.set('port',this.port);
     this.guardedMethods = {
       letMeIn: 'remote',
@@ -75,32 +47,14 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       letMeOut: 'sessions'
     };
     this.targets = new lib.Map();
-    this.remoteDBSink = null;
-    this.remoteDBSinkFinder = null;
-    if (prophash && prophash.strategies && prophash.strategies.remote){
-      this.remoteDBSinkFinder = taskRegistry.run('findSink', {
-        sinkname: prophash.strategies.remote.sinkname,
-        identity: prophash.strategies.remote.identity,
-        onSink: this.onRemoteDBSink.bind(this)
-      });
-    }
-    this.sessionsSinkName = prophash.sessionsDB;
-    this.sessionsDBSinkFinder = null;
     this.secondFactorAuthModules = prophash.secondfactorauthmodules;
     this.secondFactorAuthenticators = new lib.Map();
-    if (this.sessionsSinkName) {
-      this.sessionsDBSinkFinder = taskRegistry.run('findSink', {
-        sinkname: this.sessionsSinkName,
-        identity: {
-          name: 'user',
-          role: 'user',
-        },
-        onSink: this.onSessionsSink.bind(this)
-      });
-    }
     this.processTarget(prophash.target);
   }
   ParentService.inherit(EntryPointService,factoryCreator);
+  RemoteServiceListenerServiceMixin.addMethods(EntryPointService);
+  RemoteStrategyServiceMixin.addMethods(EntryPointService);
+  SessionsStrategyServiceMixin.addMethods(EntryPointService);
   EntryPointService.prototype.__cleanUp = function () {
     if (this.secondFactorAuthenticators) {
       lib.arryDestroyAll(this.secondFactorAuthenticators);
@@ -108,31 +62,16 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     this.secondFactorAuthenticators = null;
     this.secondFactorAuthModules = null;
-    if (this.sessionsDBSinkFinder) {
-      this.sessionsDBSinkFinder.destroy();
-    }
-    this.sessionsDBSinkFinder = null;
-    var sw = this.state.get('sessions');
-    if (sw) {
-      this.state.remove('sessions');
-      sw.destroy();
-    }
-    this.sessionsSinkName = null;
     if(!this.targets){
       return;
     }
-    if(this.remoteDBSinkFinder){
-      this.remoteDBSinkFinder.destroy();
-    }
-    this.remoteDBSinkFinder = null;
-    if(this.remoteDBSink){
-      this.remoteDBSink.destroy();
-    }
-    this.remoteDBSink = null;
     lib.containerDestroyAll(this.targets);
     this.targets.destroy();
     this.targets = null;
     this.port = null;
+    SessionsStrategyServiceMixin.prototype.destroy.call(this);
+    RemoteStrategyServiceMixin.prototype.destroy.call(this);
+    RemoteServiceListenerServiceMixin.prototype.destroy.call(this);
     ParentService.prototype.__cleanUp.call(this);
   };
   EntryPointService.prototype.isInitiallyReady = function () {
@@ -146,13 +85,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     ParentService.prototype.onAuthenticator.call(this, authsink);
     this.loadSecondFactorAuthModules();
   };
-  EntryPointService.prototype.onRemoteDBSink = function (remotedbsink) {
-    if(!this.destroyed){
-      remotedbsink.destroy();
-      return;
-    }
-    this.remoteDBSink = remotedbsink;
-  };
   EntryPointService.prototype.processResolvedUser = function (userhash) {
     var secondphaseauth;
     if(!userhash){
@@ -164,19 +96,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
         return secondphaseauth.generateToken(userhash.profile).then(this.onSecondPhaseToken.bind(this, userhash));
       }
     }
-    return this.produceSession(userhash);
-  };
-  EntryPointService.prototype.produceSession = function(userhash){
-    var session = lib.uid(),
-      identityobj = {userhash:userhash,session:session},
-      sw = this.state.get('sessions');
-    if (sw) {
-      return sw.call('create', {session:session, username: userhash.name}).then(
-        qlib.returner(identityobj)
-      );
-    } else {
-      return q(identityobj);
-    }
+    return this.produceAuthSession(userhash);
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
     if (!(url && url.auth)) {
@@ -185,20 +105,18 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     this.processResolvedUser(url.auth).then(
       this.doLetHimIn.bind(this, res)
-    ).catch(function(reason){
-      res.end('{}');
-      res = null;
-    });
+    ).catch(
+      this.resEnder(res, '{}')
+    );
   };
   EntryPointService.prototype.letUserHashIn = function (res, userhash) {
-    this.authenticate(userhash).then(
+    this.authenticate({remote:userhash}).then(
       this.processResolvedUser.bind(this)
     ).then(
       this.doLetHimIn.bind(this, res)
-    ).catch(function(reason){
-      res.end('{}');
-      res = null;
-    });
+    ).catch(
+      this.resEnder(res, '{}')
+    );
   };
   EntryPointService.prototype.doLetHimIn = function (res, identityobj) {
     if(!(identityobj && identityobj.session)){
@@ -215,7 +133,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
 
     //now, introduceSession to a __chosen__ target. __chosen__
     this.chooseTarget()
-    .then(null, console.log.bind(console, 'chooseTarget failed'))
     .done(
       this.onTargetChosen.bind(this,res,identityobj),
       this.resEnder(res, '{}')
@@ -227,7 +144,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       res.end('{}');
       return;
     }
-    this.onSessionRead(url.auth.session, url.alreadyprocessed.secondphasetoken, url.auth)
+    this.onSessionMaybeChecked(url.auth.session, url.alreadyprocessed.secondphasetoken, url.auth)
     .done(
       this.doLetHimIn.bind(this, res),
       function (error) {
@@ -242,7 +159,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
     if(url && url.auth && url.auth.session){
-      this.deleteSession(url.auth.session, url.auth)
+      this.deleteAuthSession(url.auth.session, url.auth)
       .then(
         this.onSessionDeleted.bind(this, res)
       )
@@ -253,29 +170,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       console.log('no session', url.query.session);
       res.end('{}');
     }
-  };
-  EntryPointService.prototype.deleteSession = function (session, userhash, defer) {
-    defer = defer || q.defer();
-    var sw = this.state.get('sessions');
-    if (sw) {
-      sw.call('delete',{op:'eq',field:'session',value:session})
-      .then(
-        defer.resolve.bind(defer, userhash),
-        defer.reject.bind(defer),
-        defer.notify.bind(defer)
-      );
-    } else {
-      if (this.destroyed) {
-        if (this.sessionsSinkName) {
-          lib.runNext(this.deleteSession.bind(this, session, userhash, defer), 100);
-        } else {
-          defer.reject(new lib.Error('NO_SESSION_SUPPORT'));
-        }
-      } else {
-        defer.reject(new lib.Error('SERVICE_ALREADY_DESTROYED'));
-      }
-    }
-    return defer.promise;
   };
   EntryPointService.prototype.onSessionDeleted = function (res, userhash) {
     //res.end.bind(res,'ok');
@@ -314,23 +208,19 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     );
   };
   EntryPointService.prototype.onRegisterParams = function (res, registerobj) {
-    if(!this.remoteDBSink){
-      res.end(JSON.stringify({error: 'NO_DB_YET'}));
-      return;
-    }
-    this.remoteDBSink.call('registerUser',registerobj).done(
+    this.registerRemoteUser(registerobj).then(
       this.onRegisterSucceeded.bind(this, res, registerobj),
       this.resEnder(res, '{}')
     );
   };
   EntryPointService.prototype.onRegisterSucceeded = function (res, registerobj, result) {
-    this.authenticate(registerobj).then(
+    this.authenticate({remote:registerobj}).then(
       this.processResolvedUser.bind(this)
     ).then(
       this.doLetHimIn.bind(this, res)
-    ).catch(function(reason){
-      this.resEnder(res, '{}')
-    });
+    ).catch(
+      this.resEnder.bind(this, res, '{}')
+    );
   };
   EntryPointService.prototype.usernameExists = function (url, req, res) {
     this.extractRequestParams(url, req).then(
@@ -345,13 +235,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       res.end('{}');
       return;
     }
-    if(!this.remoteDBSink){
-      res.end(JSON.stringify({
-        error: 'NO_DB_YET'
-      }));
-      return;
-    }
-    this.remoteDBSink.call('usernameExists',username).done(
+    this.checkUsernameExistence(username).then(
       (ueresult) => {
         res.end(JSON.stringify({
           username: username,
@@ -363,13 +247,10 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       this.resEnder(res, '{}')
     );
   };
-  EntryPointService.prototype.onSessionRead = function (session, token, record) {
+  EntryPointService.prototype.onSessionMaybeChecked = function (session, token, record) {
     var spc;
-    if (!this.remoteDBSink) {
-      return q.reject(new lib.Error('NO_DB_YET', session));
-    }
     if (record) {
-      //now get the User DB record from remoteDBSink and resolve the defer with that record data
+      //now get the User DB record from remote authentication and resolve the defer with that record data
       spc = this.checkForSecondPhaseUserName(record.username);
       if (spc && 'object' === typeof spc && 'username' in spc && 'token' in spc) {
         if (token != spc.token) {
@@ -377,7 +258,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
           return q.reject(new lib.Error('SECONDPHASE_TOKEN_MISMATCH'));
         }
         record.username = spc.username;
-        return this.deleteSession(session, record).then(
+        return this.deleteAuthSession(session, record).then(
           this.fetchUserFromSessionRecord.bind(this, session)
         );
       }
@@ -387,19 +268,10 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
   };
   EntryPointService.prototype.fetchUserFromSessionRecord = function (session, record) {
-    return this.remoteDBSink.call('fetchUser', {
-      username: record.username
-    }).then(this.onUserFetched.bind(this, session));
+    return this.fetchRemoteUser(record.username).then(this.onUserFetched.bind(this, session));
   };
   EntryPointService.prototype.onUserFetched = function (session, userhash) {
     return q({userhash:userhash,session:session});
-  };
-  EntryPointService.prototype.onSessionsSink = function (sessionssink) {
-    if (sessionssink) {
-      this.state.set('sessions', sessionssink);
-    } else {
-      this.state.remove('sessions');
-    }
   };
 
   //target handling fun
@@ -513,9 +385,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       port = targetobj.target.publicport || targetobj.target.port,
       session = identityobj.session;
 
-
     targetobj.target.sink.call('introduceSession',identityobj.session,identityobj.userhash)
-    .then(null, console.log.bind(console, 'introduceSession failed'))
     .done(
       this.onTargetSessionIntroduced.bind(this, ipaddress, port, session, res),
       res.end.bind(res, '{}')
@@ -540,7 +410,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     res.end(JSON.stringify(ret));
   };
-  EntryPointService.prototype.anonymousMethods = ['register'];
+  EntryPointService.prototype.anonymousMethods.push('register');
   require('./secondfactorauthextension')(execlib, EntryPointService);
   
   return EntryPointService;

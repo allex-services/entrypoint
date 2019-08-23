@@ -43,7 +43,7 @@ function createSecondFactorExtension (execlib, EntryPointService) {
     if (token) {
       return this.produceSecondPhaseSession(userhash, token);
     }
-    return this.produceSession(userhash);
+    return this.produceAuthSession(userhash);
   };
   EntryPointService.prototype.produceSecondPhaseSession = function (userhash, token){
     var session = lib.uid(),

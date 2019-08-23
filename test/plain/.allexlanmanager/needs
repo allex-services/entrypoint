@@ -1,0 +1,62 @@
+[
+  {
+    "modulename": "allex_hotelservice",
+    "instancename": "Hotel",
+    "propertyhash": {
+      "usermodule": {
+        "namespace": "",
+        "basename": ""
+      }
+    }
+  },
+  {
+    "modulename": "allex_userresolverservice",
+    "instancename": "UsersDBResolver",
+    "propertyhash": {
+      "data": {
+        "modulename": "allex_generichumanuserdataservice",
+        "storage": {
+          "modulename": "allex_mongostorage",
+          "propertyhash": {
+            "server": "127.0.0.1",
+            "database": "testentrypoint",
+            "table": "users"
+          }
+        }
+      }
+    }
+  },
+  {
+    "modulename": "allex_usersessionsservice",
+    "instancename": "UserSessions",
+    "propertyhash": {
+      "storage": {
+        "modulename": "allex_mongostorage",
+        "propertyhash": {
+          "server": "127.0.0.1",
+          "database": "testentrypoint",
+          "table": "sessions"
+        }
+      }
+    }
+  },
+  {
+    "modulename": "allex_entrypointservice",
+    "instancename": "EntryPoint",
+    "propertyhash": {
+      "port": "11320",
+      "target": "instancename:Hotel",
+      "allowAnonymous": true,
+      "sessionsDB": "UserSessions",
+      "strategies": {
+        "remote": {
+          "sinkname": "UsersDBResolver",
+          "identity": {
+            "role": "user",
+            "name": "user"
+          }
+        }
+      }
+    }
+  }
+]
