@@ -30,8 +30,7 @@ describe ('Basic Tests', function () {
   it('find EntryPoint', function () {
     return setGlobal('EntryPoint', findSink('EntryPoint'));
   });
-  /*
-  it('announce existing User', function () {
+  it('announce existing User - no password change', function () {
     return expect(
       setGlobal('announceKnownUserResult', EntryPoint.call('announceUser', {username: UserName1, password: 'blah', role:'generichumanuserdata'}, false, true))
     ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
@@ -41,14 +40,41 @@ describe ('Basic Tests', function () {
       setGlobal('letMeInOnAnnouncedResult', request('letMeInWithSession', {__sessions__id: announceKnownUserResult.session}))
     ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
   });
-  it('letMeOut with the announce sessionid', function () {
+  it('letMeOut with the announced sessionid', function () {
     return expect(request('letMeOut', {__sessions__id: announceKnownUserResult.session})).to.eventually.equal('ok');
   });
-  it('announce non-existing User', function () {
+  it('announce non-existing User but not force register', function () {
     return expect(
       EntryPoint.call('announceUser', {username: lib.uid(), password: 'blah', role:'generichumanuserdata'}, false, true)
     ).to.eventually.be.rejected;
   });
+  it('announce non-existing User but force register', function () {
+    return expect(
+      setGlobal('announceKnownUserResult', EntryPoint.call('announceUser', {username: lib.uid(), password: 'blah', role:'generichumanuserdata'}, true, true))
+    ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
+  });
+  it('login as announced', function () {
+    return expect(
+      setGlobal('letMeInOnAnnouncedResult', request('letMeInWithSession', {__sessions__id: announceKnownUserResult.session}))
+    ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
+  });
+  it('letMeOut with the announced sessionid', function () {
+    return expect(request('letMeOut', {__sessions__id: announceKnownUserResult.session})).to.eventually.equal('ok');
+  });
+  it('announce existing User - with password change', function () {
+    return expect(
+      setGlobal('announceKnownUserResult', EntryPoint.call('announceUser', {username: UserName1, password: lib.uid(), role:'generichumanuserdata'}, false, false))
+    ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
+  });
+  it('login as announced', function () {
+    return expect(
+      setGlobal('letMeInOnAnnouncedResult', request('letMeInWithSession', {__sessions__id: announceKnownUserResult.session}))
+    ).to.eventually.have.all.keys('ipaddress', 'port', 'session');
+  });
+  it('letMeOut with the announced sessionid', function () {
+    return expect(request('letMeOut', {__sessions__id: announceKnownUserResult.session})).to.eventually.equal('ok');
+  });
+  /*
   */
   it('Destroy EntryPoint sink', function () {
     EntryPoint.destroy();

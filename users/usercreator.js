@@ -46,7 +46,7 @@ function createUser(execlib, ParentUser, AllexResponse) {
         return;
       }
       userhash.password = lib.uid();
-      this.forceRemotePassword(checkres.username, userhash.password).then(
+      this.__service.forceRemotePassword(checkres.username, userhash.password).then(
         this.onAnnouncedUserPasswordChanged.bind(this, userhash, defer),
         defer.reject.bind(defer)
       );
@@ -60,7 +60,7 @@ function createUser(execlib, ParentUser, AllexResponse) {
   };
   
   User.prototype.announceUserWithNoPasswordChange = function (userhash, doregister, defer) {
-    this.__service.fetchRemoteUser(userhash).then(
+    this.__service.fetchRemoteUser(userhash.username).then(
       this.onAnnouncedUserFetched.bind(this, userhash, doregister, defer),
       defer.reject.bind(defer)
     );
