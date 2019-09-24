@@ -11,7 +11,7 @@ function createFindMeInTask (execlib, LetMeInTask) {
   lib.inherit(FindMeInTask, LetMeInTask);
 
   FindMeInTask.prototype.obtainEntryPointSink = function () {
-    taskRegistry.run('findSink', {
+    this.task = taskRegistry.run('findSink', {
       sinkname: this.sinkname,
       identity: this.identity,
       onSink: this.onUserServiceSink.bind(this, null)

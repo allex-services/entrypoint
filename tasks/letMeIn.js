@@ -27,7 +27,7 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
       this.destroy();
       return;
     }
-    taskRegistry.run('findAndRun', {
+    this.task = taskRegistry.run('findAndRun', {
       program: {
         sinkname: this.sinkname,
         identity: {name: 'user', role: 'user'},

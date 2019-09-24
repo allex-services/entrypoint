@@ -1,4 +1,4 @@
-function createUserServiceSinkObtainer (execlib) {
+function createUserServiceSinkObtainer (execlib, waitForStateField) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -13,9 +13,21 @@ function createUserServiceSinkObtainer (execlib) {
     this.propertyhash = prophash.propertyhash;
     this.cb = prophash.cb;
     this.ipaddress = null;
+    this.targetSink = null;
+    this.acquireUserServiceSinkTask = null;
+    this.task = null;
   }
   lib.inherit(UserServiceSinkObtainerTask, Task);
   UserServiceSinkObtainerTask.prototype.destroy = function () {
+    if (this.task) {
+      this.task.destroy();
+    }
+    this.task = null;
+    if (this.acquireUserServiceSinkTask) {
+      this.acquireUserServiceSinkTask.destroy();
+    }
+    this.acquireUserServiceSinkTask = null;
+    this.targetSink = null;
     this.ipaddress = null;
     this.cb = null;
     this.propertyhash = null;
@@ -27,9 +39,10 @@ function createUserServiceSinkObtainer (execlib) {
     this.obtainEntryPointSink();
   };
   UserServiceSinkObtainerTask.prototype.onEntryPointSink = function (sinkinfo) {
-    if(!sinkinfo.sink){
+    if(!(sinkinfo && sinkinfo.sink)){
       return;
     }
+    /*
     taskRegistry.run('readState', {
       state: taskRegistry.run('materializeState', {
         sink: sinkinfo.sink
@@ -37,6 +50,8 @@ function createUserServiceSinkObtainer (execlib) {
       name: 'port',
       cb: this.onEntryPointPort.bind(this,sinkinfo)
     });
+    */
+    waitForStateField(sinkinfo.sink, 'port').then(this.onEntryPointPort.bind(this, sinkinfo));
   };
   UserServiceSinkObtainerTask.prototype.onEntryPointPort = function (sinkinfo, port) {
     sinkinfo.sink.destroy();
@@ -93,6 +108,7 @@ function createUserServiceSinkObtainer (execlib) {
     if(!sink) {
       return;
     }
+    this.targetSink = sink;
     lib.runNext(taskobj.task.destroy.bind(taskobj.task));
     taskobj.task = null;
     taskobj = null;
@@ -111,7 +127,16 @@ function createUserServiceSinkObtainer (execlib) {
       this.finalize(session, sink);
     }
   };
+  function targetSinkDestroyer (tgtsink) {
+    if (tgtsink && tgtsink.destroyed) {
+      tgtsink.destroy();
+    }
+    tgtsink = null;
+  }
   UserServiceSinkObtainerTask.prototype.finalize = function (session, sink) {
+    if (sink.destroyed) {
+      sink.destroyed.attachForSingleShot(targetSinkDestroyer.bind(null, this.targetSink));
+    }
     if (this.cb) {
       this.cb({
         task: this,
@@ -120,6 +145,8 @@ function createUserServiceSinkObtainer (execlib) {
         taskRegistry: taskRegistry,
         execlib: execlib
       });
+    } else {
+      sink.destroy();
     }
   };
   UserServiceSinkObtainerTask.prototype.goForLetMeOut = function (address, port) {

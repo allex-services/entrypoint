@@ -1,7 +1,7 @@
-function createClientSide(execlib, UserRepresentation) {
+function createClientSide(execlib, UserRepresentation, readSinkState) {
   'use strict';
   execlib.execSuite.UserRepresentation = UserRepresentation;
-  var UserServiceSinkObtainerTask = require('./tasks/userservicesinkobtainercreator')(execlib),
+  var UserServiceSinkObtainerTask = require('./tasks/userservicesinkobtainercreator')(execlib, readSinkState),
     GetInTask = require('./tasks/getIn')(execlib, UserServiceSinkObtainerTask),
     GetOutTask = require('./tasks/getOut')(execlib, UserServiceSinkObtainerTask),
     LetMeInTask = require('./tasks/letMeIn')(execlib, UserServiceSinkObtainerTask);

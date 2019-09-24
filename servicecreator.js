@@ -410,7 +410,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
     res.end(JSON.stringify(ret));
   };
-  EntryPointService.prototype.anonymousMethods.push('register');
+  EntryPointService.prototype.anonymousMethods.push('register', 'usernameExists');
   require('./secondfactorauthextension')(execlib, EntryPointService);
   
   return EntryPointService;

@@ -1,9 +1,4 @@
-describe ('Basic Tests', function () {
-  loadMochaIntegration('allex_httpservice');
-  it('prepare the request function', function () {
-    setGlobal('Requester', new HTTPRequester('http', '127.0.0.1', 11320, 'GET', {debug: false}));
-    setGlobal('request', Requester.request.bind(Requester));
-  });
+function testCycle () {
   it('Set a username and pass', function () {
     setGlobal('UserName1', lib.uid());
     setGlobal('Password1', lib.uid());
@@ -11,11 +6,24 @@ describe ('Basic Tests', function () {
   it('Unsuccessful Login', function () {
     return  expect(request('letMeIn', {__remote__username: UserName1, __remote__password: Password1})).to.eventually.be.empty;
   });
+  it('ask for usernameExists should return false', function () {
+    return expect(request('usernameExists', {username: UserName1})).to.eventually.include({
+      username: UserName1,
+      exists: false
+    });
+  });
   it('register', function () {
     return expect(request('register', {username: UserName1, password: Password1, role:'generichumanuserdata'})).to.eventually.have.all.keys('ipaddress', 'port', 'session');
   });
+  it('ask for usernameExists should return true', function () {
+    setGlobal('RegistrationReply', Requester.lastReply); //will need this to letMeOut later
+    return expect(request('usernameExists', {username: UserName1})).to.eventually.include({
+      username: UserName1,
+      exists: true
+    });
+  });
   it('letMeOut with the registration sessionid', function () {
-    return expect(request('letMeOut', {__sessions__id: Requester.lastReply.session})).to.eventually.equal('ok');
+    return expect(request('letMeOut', {__sessions__id: RegistrationReply.session})).to.eventually.equal('ok');
   });
   it('Unsuccessful Login with the wrong password', function () {
     return  expect(request('letMeIn', {__remote__username: UserName1, __remote__password: lib.uid()})).to.eventually.be.empty;
@@ -79,4 +87,15 @@ describe ('Basic Tests', function () {
   it('Destroy EntryPoint sink', function () {
     EntryPoint.destroy();
   });
+}
+
+describe ('Basic Tests', function () {
+  loadMochaIntegration('allex_httpservice');
+  it('prepare the request function', function () {
+    setGlobal('Requester', new HTTPRequester('http', '127.0.0.1', 11320, 'GET', {debug: false}));
+    setGlobal('request', Requester.request.bind(Requester));
+  });
+  for (var i=0; i<500; i++) {
+    testCycle();
+  }
 });
