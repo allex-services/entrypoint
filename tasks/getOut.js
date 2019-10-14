@@ -1,4 +1,4 @@
-function createGetOutTask (execlib, UserServiceSinkObtainerTask) {
+function createGetOutTask (execlib, UserServiceViaEntryPointSinkObtainerTask) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -6,15 +6,15 @@ function createGetOutTask (execlib, UserServiceSinkObtainerTask) {
     taskRegistry = execSuite.taskRegistry;
 
   function GetOutTask (prophash) {
-    UserServiceSinkObtainerTask.call(this, prophash);
+    UserServiceViaEntryPointSinkObtainerTask.call(this, prophash);
     this.ep_ipaddress = prophash.ipaddress;
     this.ep_port = prophash.port;
   }
-  lib.inherit(GetOutTask, UserServiceSinkObtainerTask);
+  lib.inherit(GetOutTask, UserServiceViaEntryPointSinkObtainerTask);
   GetOutTask.prototype.destroy = function () {
     this.ep_port = null;
     this.ep_ipaddress = null;
-    UserServiceSinkObtainerTask.prototype.destroy.call(this);
+    UserServiceViaEntryPointSinkObtainerTask.prototype.destroy.call(this);
   };
   GetOutTask.prototype.obtainEntryPointSink = function () {
     this.goForLetMeOut(this.ep_ipaddress, this.ep_port);

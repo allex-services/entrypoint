@@ -1,4 +1,4 @@
-function createGetInTask (execlib, UserServiceSinkObtainerTask) {
+function createGetInTask (execlib, UserServiceViaEntryPointSinkObtainerTask) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -6,15 +6,15 @@ function createGetInTask (execlib, UserServiceSinkObtainerTask) {
     taskRegistry = execSuite.taskRegistry;
 
   function GetInTask (prophash) {
-    UserServiceSinkObtainerTask.call(this, prophash);
+    UserServiceViaEntryPointSinkObtainerTask.call(this, prophash);
     this.ep_ipaddress = prophash.ipaddress;
     this.ep_port = prophash.port;
   }
-  lib.inherit(GetInTask, UserServiceSinkObtainerTask);
+  lib.inherit(GetInTask, UserServiceViaEntryPointSinkObtainerTask);
   GetInTask.prototype.destroy = function () {
     this.ep_port = null;
     this.ep_ipaddress = null;
-    UserServiceSinkObtainerTask.prototype.destroy.call(this);
+    UserServiceViaEntryPointSinkObtainerTask.prototype.destroy.call(this);
   };
   GetInTask.prototype.obtainEntryPointSink = function () {
     this.goForLetMeIn(this.ep_ipaddress, this.ep_port);

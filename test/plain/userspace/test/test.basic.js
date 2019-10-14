@@ -95,7 +95,7 @@ describe ('Basic Tests', function () {
     setGlobal('Requester', new HTTPRequester('http', '127.0.0.1', 11320, 'GET', {debug: false}));
     setGlobal('request', Requester.request.bind(Requester));
   });
-  for (var i=0; i<500; i++) {
+  for (var i=0; i<50; i++) {
     testCycle();
   }
 });

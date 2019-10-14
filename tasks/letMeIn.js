@@ -1,4 +1,4 @@
-function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
+function createLetMeInTask (execlib, UserServiceViaEntryPointSinkObtainerTask) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -6,12 +6,12 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
     taskRegistry = execSuite.taskRegistry;
 
   function LetMeInTask (prophash) {
-    UserServiceSinkObtainerTask.call(this, prophash);
+    UserServiceViaEntryPointSinkObtainerTask.call(this, prophash);
     this.sinkname = prophash.sinkname || 'EntryPoint';
     this.representation = new execSuite.UserRepresentation(prophash.eventhandlers);
     this.sinkinfoextras = prophash.sinkinfoextras;
   }
-  lib.inherit(LetMeInTask, UserServiceSinkObtainerTask);
+  lib.inherit(LetMeInTask, UserServiceViaEntryPointSinkObtainerTask);
   LetMeInTask.prototype.destroy = function () {
     this.sinkinfoextras = null;
     if (this.representation) {
@@ -19,7 +19,7 @@ function createLetMeInTask (execlib, UserServiceSinkObtainerTask) {
     }
     this.representation = null;
     this.sinkname = null;
-    UserServiceSinkObtainerTask.prototype.destroy.call(this);
+    UserServiceViaEntryPointSinkObtainerTask.prototype.destroy.call(this);
   };
   LetMeInTask.prototype.obtainEntryPointSink = function () {
     if(!this.sinkname){

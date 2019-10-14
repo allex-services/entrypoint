@@ -1,4 +1,4 @@
-function createUserServiceSinkObtainer (execlib, waitForStateField) {
+function createUserServiceSinkObtainer (execlib) {
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
@@ -36,26 +36,7 @@ function createUserServiceSinkObtainer (execlib, waitForStateField) {
     Task.prototype.destroy.call(this);
   };
   UserServiceSinkObtainerTask.prototype.go = function () {
-    this.obtainEntryPointSink();
-  };
-  UserServiceSinkObtainerTask.prototype.onEntryPointSink = function (sinkinfo) {
-    if(!(sinkinfo && sinkinfo.sink)){
-      return;
-    }
-    /*
-    taskRegistry.run('readState', {
-      state: taskRegistry.run('materializeState', {
-        sink: sinkinfo.sink
-      }),
-      name: 'port',
-      cb: this.onEntryPointPort.bind(this,sinkinfo)
-    });
-    */
-    waitForStateField(sinkinfo.sink, 'port').then(this.onEntryPointPort.bind(this, sinkinfo));
-  };
-  UserServiceSinkObtainerTask.prototype.onEntryPointPort = function (sinkinfo, port) {
-    sinkinfo.sink.destroy();
-    this.goForLetMeIn(sinkinfo.ipaddress, port);
+    this.obtainEntryPointAddressAndPort();
   };
   UserServiceSinkObtainerTask.prototype.goForLetMeIn = function (address, port) {
     if (!this.log) {
