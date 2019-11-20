@@ -185,7 +185,6 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       res.end(JSON.stringify({error:'NO_TARGETS_YET'}));
       return;
     }
-    console.log('should logout', userhash);
     if(!(userhash && userhash.userhash && userhash.userhash.profile && userhash.userhash.profile.username)){
       res.end('ok');
       return;
