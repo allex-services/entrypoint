@@ -299,17 +299,17 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
           name:this.onSingleTargetFound.bind(this,sinkname),
           propertyhash:{
             ipaddress: 'fill yourself',
-            wsport: 'fill yourself'
+            httpport: 'fill yourself'
           }
         }
       }
     });
   };
   EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
-    //console.log('going to nat',sinkinfo.ipaddress,':',sinkinfo.wsport);
+    //console.log('going to nat',sinkinfo.ipaddress,':',sinkinfo.httpport);
     taskRegistry.run('natThis', {
       iaddress: sinkinfo.ipaddress,
-      iport: sinkinfo.wsport,
+      iport: sinkinfo.httpport,
       cb: this.onSingleTargetNatted.bind(this, sinkname, sinkinfo),
       singleshot: true
     });
@@ -322,10 +322,10 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     this.huntSingleTarget(sinkname);
   };
   EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
-    //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.wsport,'=>',eaddress,eport);
+    //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.httpport,'=>',eaddress,eport);
     var tc;
     sinkinfo.ipaddress = eaddress;
-    sinkinfo.wsport = eport;
+    sinkinfo.httpport = eport;
     if(sinkinfo.sink){
       tc = new TargetContainer(sinkname,sinkinfo);
       tc.destroyed.attach(this.onTargetContainerDown.bind(this, sinkname));

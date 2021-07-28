@@ -6,11 +6,11 @@ function createTargetContainer(execlib){
 
   function TargetContainer(sinkname,sinkinfo){
     Destroyable.call(this);
-    console.log('single target found',sinkinfo.ipaddress,':',sinkinfo.wsport);
+    console.log('single target found',sinkinfo.ipaddress,':',sinkinfo.httpport);
     this.name = sinkname;
     this.sink = sinkinfo.sink;
     this.address = sinkinfo.ipaddress;
-    this.port = sinkinfo.wsport;
+    this.port = sinkinfo.httpport;
     //clear the sinkinfo
     sinkinfo.sink = null;
     sinkinfo.ipaddress = null;
