@@ -57,7 +57,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
   SessionsStrategyServiceMixin.addMethods(EntryPointService);
   EntryPointService.prototype.__cleanUp = function () {
     if (this.secondFactorAuthenticators) {
-      lib.arryDestroyAll(this.secondFactorAuthenticators);
+      lib.containerDestroyAll(this.secondFactorAuthenticators);
       this.secondFactorAuthenticators.destroy();
     }
     this.secondFactorAuthenticators = null;
