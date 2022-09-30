@@ -2,9 +2,10 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
   'use strict';
   var lib = execlib.lib,
     q = lib.q,
+    qlib = lib.qlib,
     execSuite = execlib.execSuite,
     taskRegistry = execSuite.taskRegistry,
-    qlib = lib.qlib,
+    jobcores = require('./jobcores')(execlib),
     RemoteServiceListenerServiceMixin = execSuite.RemoteServiceListenerServiceMixin,
     TargetContainer = require('./targetcontainercreator')(execlib),
     ClusterRepresentativeHunter = require('./clusterrepresentativehuntercreator')(execlib),
@@ -44,6 +45,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     this.guardedMethods = {
       letMeIn: 'remote',
       letMeInWithSession: 'sessions',
+      cloneSession: 'sessions',
       letMeOut: 'sessions'
     };
     this.targets = new lib.Map();
@@ -99,15 +101,9 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     return this.produceAuthSession(userhash);
   };
   EntryPointService.prototype.letMeIn = function(url,req,res){
-    if (!(url && url.auth)) {
-      res.end('{}');
-      return;
-    }
-    this.processResolvedUser(url.auth).then(
-      this.doLetHimIn.bind(this, res)
-    ).catch(
-      this.resEnder(res, '{}')
-    );
+    return jobcores.newResponseJob(
+      new jobcores.LetMeIn(this, res, url)
+    ).go();
   };
   EntryPointService.prototype.letUserHashIn = function (res, userhash) {
     this.authenticate({remote:userhash}).then(
@@ -139,6 +135,27 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     );
     return;
   };
+  EntryPointService.prototype.cloneHim = function (res, identityobj) {
+    if(!(identityobj && identityobj.session && identityobj.userhash)){
+      res.end('{}');
+      return;
+    }
+    this.produceAuthSession(identityobj.userhash).then(
+      onAuthSessionForCloneHim.bind(null, res),
+      sessionMaybeCheckedFailer.bind(res)
+    );
+    res = null;
+  };
+  function onAuthSessionForCloneHim (res, authsessres) {
+    res.end(JSON.stringify({session: authsessres.session}));
+  }
+  function sessionMaybeCheckedFailer (res, error) {
+    res.end( JSON.stringify(
+      error && error.code ?
+        {error:error.code}:
+        {}
+    ));
+  }
   EntryPointService.prototype.letMeInWithSession = function(url,req,res){
     if (!(url && url.auth)) {
       res.end('{}');
@@ -147,15 +164,24 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     this.onSessionMaybeChecked(url.auth.session, url.alreadyprocessed.secondphasetoken, url.auth)
     .done(
       this.doLetHimIn.bind(this, res),
-      function (error) {
-        res.end( JSON.stringify(
-          error && error.code ?
-            {error:error.code}:
-            {}
-        ));
-        res = null;
-      }
+      sessionMaybeCheckedFailer.bind(null, res)
     );
+    res = null;
+  };
+  EntryPointService.prototype.cloneSession = function(url,req,res){
+    return jobcores.newResponseJob(
+      new jobcores.CloneSession(this, res, url)
+    ).go();
+    if (!(url && url.auth)) {
+      res.end('{}');
+      return;
+    }
+    this.onSessionMaybeChecked(url.auth.session, url.alreadyprocessed.secondphasetoken, url.auth)
+    .done(
+      this.cloneHim.bind(this, res),
+      sessionMaybeCheckedFailer.bind(null, res)
+    );
+    res = null;
   };
   EntryPointService.prototype.letMeOut = function (url, req, res) {
     if(url && url.auth && url.auth.session){
@@ -290,29 +316,18 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
       jsonsinkname = JSON.parse(sinkname);
       sinkname = jsonsinkname;
     } catch (ignore) { }
-    console.log('SHOULD HUNT FOR SINGLE TARGET', sinkname);
-    taskRegistry.run('findAndRun',{
-      program: {
-        sinkname:sinkname,
-        identity:{name:'service',role:'service'},
-        task:{
-          name:this.onSingleTargetFound.bind(this,sinkname),
-          propertyhash:{
-            ipaddress: 'fill yourself',
-            httpport: 'fill yourself'
-          }
-        }
-      }
-    });
+    var ret = qlib.newSteppedJobOnSteppedInstance(
+      new jobcores.TargetHunter(this, sinkname)
+    ).go().then(
+      this.onSingleTargetHunted.bind(this, sinkname),
+      this.onHuntSingleTargetFailed.bind(this, sinkname)
+    );
+    sinkname = null;
+    return ret;
   };
-  EntryPointService.prototype.onSingleTargetFound = function(sinkname,sinkinfo){
-    //console.log('going to nat',sinkinfo.ipaddress,':',sinkinfo.httpport);
-    taskRegistry.run('natThis', {
-      iaddress: sinkinfo.ipaddress,
-      iport: sinkinfo.httpport,
-      cb: this.onSingleTargetNatted.bind(this, sinkname, sinkinfo),
-      singleshot: true
-    });
+  EntryPointService.prototype.onHuntSingleTargetFailed = function (sinkname, reason) {
+    console.log('Error while hunting single target', sinkname, reason);
+    this.huntSingleTarget(sinkname);
   };
   EntryPointService.prototype.onTargetContainerDown = function (sinkname) {
     if (!this.targets) {
@@ -321,22 +336,22 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     this.targets.remove(sinkname);
     this.huntSingleTarget(sinkname);
   };
-  EntryPointService.prototype.onSingleTargetNatted = function (sinkname, sinkinfo, eaddress, eport) {
-    //console.log('natted',sinkinfo.ipaddress,':',sinkinfo.httpport,'=>',eaddress,eport);
+  EntryPointService.prototype.onSingleTargetHunted = function (sinkname, sinkinfo) {
     var tc;
-    sinkinfo.ipaddress = eaddress;
-    sinkinfo.httpport = eport;
-    if(sinkinfo.sink){
-      tc = new TargetContainer(sinkname,sinkinfo);
-      tc.destroyed.attach(this.onTargetContainerDown.bind(this, sinkname));
-      this.targets.add(sinkname,tc);
-    }else{
-      var tc = this.targets.remove(sinkname);
+    if(sinkinfo) {
+      if (sinkinfo.sink) {
+        tc = new TargetContainer(sinkname, sinkinfo);
+        tc.destroyed.attach(this.onTargetContainerDown.bind(this, sinkname));
+        this.targets.add(sinkname,tc);
+        return;
+      }
+      tc = this.targets.remove(sinkname);
       if(tc){
         tc.destroy();
       }
-      this.huntSingleTarget(sinkname);
+      return;
     }
+    this.huntSingleTarget(sinkname);
   };
   EntryPointService.prototype.huntClusterRepresentative = function (clusterrepresentativearrayjson) {
     //console.log('clusterrepresentativearray', clusterrepresentativearray);
