@@ -9,10 +9,10 @@ function createBaseJobCore (lib, mylib) {
   };
   BaseOnEntryPointJobCore.prototype.shouldContinue = function () {
     if (!this.entrypoint) {
-      return new lib.Error('NO_ENTRYPOINT', this.constructor.name+' needs an EntryPoint instance');
+      throw new lib.Error('NO_ENTRYPOINT', this.constructor.name+' needs an EntryPoint instance');
     }
     if (!this.entrypoint.destroyed) {
-      return new lib.Error('ENTRYPOINT_ALREADY_DESTROYED', this.constructor.name+' encountered a destroyed EntryPoint instance');
+      throw new lib.Error('ENTRYPOINT_ALREADY_DESTROYED', this.constructor.name+' encountered a destroyed EntryPoint instance');
     }
   };
 

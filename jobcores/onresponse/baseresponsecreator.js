@@ -12,7 +12,11 @@ function createBaseOnResponseJobCore (lib, mylib) {
     this.response = null;
     Base.prototype.destroy.call(this);
   };
-  BaseOnResponseJobCore.prototype.finalResult = function () {
+  BaseOnResponseJobCore.prototype.shouldContinue = function () {
+    var ret = Base.prototype.shouldContinue.call(this);
+    if (ret) {
+      return ret;
+    }
     if (this.response.writableEnded) {
       return this.finalResultBecauseResponseEnded();
     }
