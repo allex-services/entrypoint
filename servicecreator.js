@@ -293,7 +293,7 @@ function createEntryPointService(execlib, ParentService, AuthenticationService, 
     }
   };
   EntryPointService.prototype.fetchUserFromSessionRecord = function (session, record) {
-    return this.fetchRemoteUser(record.username).then(this.onUserFetched.bind(this, session));
+    return this.fetchRemoteUser(record).then(this.onUserFetched.bind(this, session));
   };
   EntryPointService.prototype.onUserFetched = function (session, userhash) {
     return q({userhash:userhash,session:session});
