@@ -15,7 +15,7 @@ function createCloneSessionJobCore (lib, mylib) {
 
   CloneSessionJobCore.prototype.onCheckIfSessionIsChecked = function (identityobj) {
     if(!(identityobj && identityobj.session && identityobj.userhash)){
-      res.end('{}');
+      this.endResponse({});
       return;
     }
     this.userhash = identityobj.userhash;

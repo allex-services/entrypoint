@@ -82,7 +82,7 @@ function createLetInBaseJobCore (lib, mylib) {
     return null;
   };
   LetInBaseJobCore.prototype.fetchUserFromSessionRecord = function (session, record) {
-    var ret = this.entrypoint.fetchRemoteUser(record.username)
+    var ret = this.entrypoint.fetchRemoteUser(record)
       .then(onFetchUserFromSessionRecord.bind(null, session));
     session = null;
     return ret;
